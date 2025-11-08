@@ -4,6 +4,7 @@ import * as Lucide from 'lucide-react';
 import GridContainer from './components/GridContainer';
 import ChatBar from './components/ChatBar';
 import CodeEditModal from './components/CodeEditModal';
+import PreviewGrid from './components/PreviewGrid';
 import { useGridComponents } from './utils';
 // import ExportedGrid from './ExportedGrid';
 
@@ -43,6 +44,7 @@ export default function App() {
         drawStart,
         drawEnd,
         showPlaceholder,
+        isPreviewMode,
         setPlaceholderLayout,
         setChatPrompt,
         setCurrentEditingCode,
@@ -60,11 +62,8 @@ export default function App() {
         handleGridMouseDown,
         handleGridMouseMove,
         handleGridMouseUp,
+        togglePreview,
     } = useGridComponents();
-    
-    // return (
-    //     <ExportedGrid/>
-    // )
 
     const mainRef = useRef(null);
     useEffect(() => {
@@ -113,6 +112,15 @@ export default function App() {
                     </h1>
                     <div className="flex gap-2">
                         <button
+                            onClick={togglePreview}
+                            disabled={components.length === 0}
+                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium text-sm flex items-center gap-2 transition-colors"
+                            title={isPreviewMode ? "Exit Preview" : "Preview"}
+                        >
+                            {isPreviewMode ? <Lucide.Edit size={16} /> : <Lucide.Eye size={16} />}
+                            {isPreviewMode ? 'Edit Mode' : 'Preview'}
+                        </button>
+                        <button
                             onClick={clearAllComponents}
                             className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-sm flex items-center gap-2 transition-colors"
                             title="Clear all components"
@@ -140,23 +148,24 @@ export default function App() {
                     onMouseLeave={handleGridMouseUp}
                     className="flex-grow overflow-auto relative"
                 >
-                    <GridContainer
-                        components={components}
-                        onLayoutChange={handleLayoutChange}
-                        onDeleteComponent={handleDeleteComponent}
-                        openEditModal={openEditModal}
-                        onToggleLock={handleToggleLock}
-                        placeholderLayout={placeholderLayout}
-                        showPlaceholder={showPlaceholder} 
-                    />
-
-                    {isDrawing && mainRef.current && (
-                      <div style={getDrawingRect(drawStart, drawEnd, mainRef.current.scrollTop, mainRef.current.scrollLeft)} />
+                    {isPreviewMode ? (
+                        <PreviewGrid components={components} />
+                    ) : (
+                        <GridContainer
+                            components={components}
+                            onLayoutChange={handleLayoutChange}
+                            onDeleteComponent={handleDeleteComponent}
+                            openEditModal={openEditModal}
+                            onToggleLock={handleToggleLock}
+                            placeholderLayout={placeholderLayout}
+                            onPlaceholderLayoutChange={setPlaceholderLayout}
+                        />
                     )}
-
                 </main>
 
-                <ChatBar prompt={chatPrompt} setPrompt={setChatPrompt} onSubmit={handlePromptSubmit} isLoading={isLoading} />
+                {!isPreviewMode && (
+                    <ChatBar prompt={chatPrompt} setPrompt={setChatPrompt} onSubmit={handlePromptSubmit} isLoading={isLoading} />
+                )}
 
                 <CodeEditModal 
                     isOpen={isModalOpen} 

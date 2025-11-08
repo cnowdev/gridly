@@ -107,6 +107,7 @@ export function useGridComponents() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentEditingCode, setCurrentEditingCode] = useState('');
   const [currentEditingId, setCurrentEditingId] = useState(null);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
 
   useEffect(() => {
     saveState(components, placeholderLayout);
@@ -367,6 +368,10 @@ export function useGridComponents() {
     downloadJSX(jsx);
   };
 
+  const togglePreview = () => {
+    setIsPreviewMode(!isPreviewMode);
+  };
+
   return {
     // State
     components,
@@ -380,6 +385,7 @@ export function useGridComponents() {
     drawStart,
     drawEnd,
     showPlaceholder,
+    isPreviewMode,
     
     // Setters
     setPlaceholderLayout,
@@ -401,5 +407,6 @@ export function useGridComponents() {
     handleGridMouseDown,
     handleGridMouseMove,
     handleGridMouseUp,
+    togglePreview,
   };
 }
