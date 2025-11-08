@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'; // Added useEffect import
 import genai from './lib/genai';
+import { saveImage, loadImage, loadAllImages, deleteImage, clearAllImages } from './lib/imageStorage';
 
 
 
@@ -99,6 +100,11 @@ export function useGridComponents() {
   const [currentEditingId, setCurrentEditingId] = useState(null);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
 
+  // Image cache for storing blob URLs (runtime only)
+  const [imageCache] = useState(() => new Map());
+  // Track if images have been loaded from IndexedDB
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+
   useEffect(() => {
     saveState(components, placeholderLayout);
   }, [components, placeholderLayout]);
@@ -165,6 +171,173 @@ export function useGridComponents() {
     return parts.length > 0 ? parts.join('\n') : '';
   };
 
+  // Helper function to convert base64 to blob URL and store it
+  const cacheImageAsURL = async (imageBase64, componentId) => {
+    const timestamp = Date.now();
+    const key = `${componentId}-${timestamp}`;
+    
+    try {
+      // Save base64 to IndexedDB for persistence
+      await saveImage(key, imageBase64);
+      
+      // Convert base64 to blob
+      const byteCharacters = atob(imageBase64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/png' });
+      
+      // Create object URL
+      const objectURL = URL.createObjectURL(blob);
+      
+      // Store in runtime cache with the key
+      imageCache.set(key, { url: objectURL, key });
+      
+      return objectURL;
+    } catch (error) {
+      console.error('Failed to create blob URL:', error);
+      return `data:image/png;base64,${imageBase64}`;
+    }
+  };
+
+  // Helper function to restore blob URLs from IndexedDB
+  const restoreBlobURL = async (imageKey) => {
+    try {
+      // Check if already in cache
+      if (imageCache.has(imageKey)) {
+        return imageCache.get(imageKey).url;
+      }
+      
+      // Load from IndexedDB
+      const base64 = await loadImage(imageKey);
+      if (!base64) {
+        console.warn(`Image not found in IndexedDB: ${imageKey}`);
+        return null;
+      }
+      
+      // Convert base64 to blob URL
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/png' });
+      const newURL = URL.createObjectURL(blob);
+      
+      // Cache it
+      imageCache.set(imageKey, { url: newURL, key: imageKey });
+      
+      return newURL;
+    } catch (error) {
+      console.error('Failed to restore blob URL:', error);
+      return null;
+    }
+  };
+
+  // Helper function to clean up cached images
+  const cleanupImageCache = async (componentId) => {
+    for (const [key, data] of imageCache.entries()) {
+      if (key.startsWith(componentId)) {
+        URL.revokeObjectURL(data.url);
+        imageCache.delete(key);
+        // Also remove from IndexedDB
+        await deleteImage(key);
+      }
+    }
+  };
+
+  // Restore blob URLs on component mount/load
+  useEffect(() => {
+    const restoreImages = async () => {
+      if (imagesLoaded) return;
+      
+      try {
+        // Load all images from IndexedDB
+        const allImages = await loadAllImages();
+        
+        // Restore blob URLs for all stored images
+        for (const [key, base64] of Object.entries(allImages)) {
+          if (!imageCache.has(key)) {
+            const byteCharacters = atob(base64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'image/png' });
+            const newURL = URL.createObjectURL(blob);
+            imageCache.set(key, { url: newURL, key });
+          }
+        }
+        
+        setImagesLoaded(true);
+        
+        // After images are loaded, update component code with restored URLs
+        setComponents(prevComps =>
+          prevComps.map(comp => {
+            if (!comp.imageKeys || comp.imageKeys.length === 0) {
+              return comp;
+            }
+            
+            let updatedCode = comp.code;
+            let hasChanges = false;
+            
+            // For each image key, restore its blob URL in the code
+            comp.imageKeys.forEach(imageKey => {
+              if (imageCache.has(imageKey)) {
+                const { url } = imageCache.get(imageKey);
+                // Find old blob URLs and replace with new ones
+                const blobRegex = /blob:http[s]?:\/\/[^\s"')]+/g;
+                const oldUrls = updatedCode.match(blobRegex) || [];
+                
+                // If there are old blob URLs, replace the first one with our restored URL
+                if (oldUrls.length > 0) {
+                  updatedCode = updatedCode.replace(oldUrls[0], url);
+                  hasChanges = true;
+                }
+              }
+            });
+            
+            return hasChanges ? { ...comp, code: updatedCode } : comp;
+          })
+        );
+      } catch (error) {
+        console.error('Failed to restore images:', error);
+      }
+    };
+    
+    restoreImages();
+  }, [imagesLoaded]);
+
+  // Helper function to generate AI images
+  const generateImage = async (imagePrompt) => {
+    try {
+      const response = await genai.models.generateImages({
+        model: 'imagen-3.0-generate-002',
+        prompt: imagePrompt,
+        config: {
+          numberOfImages: 1,
+          includeRaiReason: true,
+        }
+      });
+      
+      const imageBase64 = response?.generatedImages?.[0]?.image?.imageBytes;
+      
+      if (!imageBase64) {
+        console.error('No image data returned from Imagen API');
+        return null;
+      }
+      
+      return imageBase64;
+    } catch (error) {
+      console.error('Image generation failed:', error);
+      return null;
+    }
+  };
+
   const fetchGeminiCode = async (prompt) => {
     if (!genai) {
       alert('Gemini API Key is not set in .env file.');
@@ -175,6 +348,13 @@ export function useGridComponents() {
 
     const systemPrompt = `
       You are an expert React and Tailwind CSS component generator.
+      
+      IF the user's request requires an AI-generated image (photo, illustration, graphic, etc.):
+        - Respond with exactly: IMAGE_REQUEST: [detailed, descriptive prompt for image generation]
+        - Make the image prompt detailed and specific
+        - ONLY do this if they need a realistic photo/illustration, NOT for icons or simple graphics
+      
+      OTHERWISE:
       You only respond with a single, pure, functional React component.
       - DO NOT include 'export default'.
       - DO NOT include 'React.createElement'.
@@ -200,8 +380,76 @@ export function useGridComponents() {
         model: 'gemini-2.5-flash',
         contents: fullPrompt,
       });
-      let code = response.text;
+      let code = response.text.trim();
 
+      // Check if AI detected an image request
+      if (code.startsWith('IMAGE_REQUEST:')) {
+        const imagePrompt = code.replace('IMAGE_REQUEST:', '').trim();
+        console.log('Generating image with prompt:', imagePrompt);
+        
+        const imageBase64 = await generateImage(imagePrompt);
+        
+        if (imageBase64) {
+          // Generate a temporary component ID for this image
+          const tempId = `comp-${Date.now()}`;
+          
+          // Convert base64 to blob URL (await it!)
+          const imageURL = await cacheImageAsURL(imageBase64, tempId);
+          
+          // Now re-prompt to generate the full component with the image URL
+          const componentPrompt = `
+            You are an expert React and Tailwind CSS component generator.
+            Return the entire component function only. DO NOT include exports, imports, or code fences.
+            Use Tailwind CSS for styling. Hooks and lucide icons are available in scope.
+
+            Use this image URL in your component:
+            <img src="${imageURL}" alt="${imagePrompt.replace(/"/g, '&quot;')}" className="your-tailwind-classes" />
+
+            IMPORTANT: Size the image appropriately using Tailwind classes:
+            - Use object-cover or object-contain to control aspect ratio
+            - Use w-full or max-w-* to control width
+            - Use h-48, h-64, h-96, or max-h-* to limit height (don't make it too tall)
+            - Consider using rounded corners (rounded-lg, rounded-xl) for aesthetics
+            
+            Style the image appropriately with Tailwind CSS to fit the overall component design.
+            Make sure the component fills its container (h-full w-full).
+
+            ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ''}
+
+            Original user request: ${prompt}
+          `;
+
+          const componentResponse = await genai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: componentPrompt,
+          });
+          
+          code = componentResponse.text.trim();
+        } else {
+          // If image generation failed, prompt for a fallback component
+          const fallbackPrompt = `
+            You are an expert React and Tailwind CSS component generator.
+            Return the entire component function only. DO NOT include exports, imports, or code fences.
+            Use Tailwind CSS for styling. Hooks and lucide icons are available in scope.
+
+            Image generation failed - create a component with a placeholder or Lucide icon instead.
+            Make sure the component fills its container (h-full w-full).
+
+            ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ''}
+
+            Original user request: ${prompt}
+          `;
+
+          const fallbackResponse = await genai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: fallbackPrompt,
+          });
+          
+          code = fallbackResponse.text.trim();
+        }
+      }
+
+      // Regular code generation - clean up markdown
       const match = code.match(/```(?:jsx|javascript|js)?\n([\s\S]*?)\n```/);
       if (match) code = match[1];
       else code = code.replace(/```jsx|```/g, '');
@@ -225,6 +473,11 @@ export function useGridComponents() {
     const designSystem = getDesignSystemPrompt();
 
     const editPrompt = `
+      IF the user is asking for an AI-generated image, photo, illustration, graphic, or visual asset to be added/changed:
+        - Respond with exactly: IMAGE_REQUEST: [detailed, descriptive prompt for image generation]
+        - Make the image prompt detailed and specific
+      
+      OTHERWISE:
       You are an expert React and Tailwind CSS component editor.
       Return the entire new component function only. DO NOT include exports, imports, or code fences.
       Use Tailwind CSS for styling. Hooks and lucide icons are available in scope. When using Lucide icons, use
@@ -243,8 +496,83 @@ export function useGridComponents() {
         model: 'gemini-2.5-flash',
         contents: editPrompt,
       });
-      let newCode = response.text;
+      let newCode = response.text.trim();
 
+      // Check if AI detected an image request
+      if (newCode.startsWith('IMAGE_REQUEST:')) {
+        const imagePrompt = newCode.replace('IMAGE_REQUEST:', '').trim();
+        console.log('Generating image for edit with prompt:', imagePrompt);
+        
+        const imageBase64 = await generateImage(imagePrompt);
+
+        if (imageBase64) {
+          // Convert base64 to blob URL (await it!)
+          const imageURL = await cacheImageAsURL(imageBase64, currentEditingId);
+          
+          // Generate component code that includes the image URL
+          const componentPrompt = `
+            You are an expert React and Tailwind CSS component editor.
+            Return the entire new component function only. DO NOT include exports, imports, or code fences.
+            Use Tailwind CSS for styling. Hooks and lucide icons are available in scope.
+
+            The user requested an image be ${currentCode.includes('blob:') || currentCode.includes('data:image') ? 'replaced' : 'added'} to the component.
+            
+            Use this image URL in your component:
+            <img src="${imageURL}" alt="${imagePrompt.replace(/"/g, '&quot;')}" className="your-tailwind-classes" />
+
+            IMPORTANT: Size the image appropriately using Tailwind classes:
+            - Use object-cover or object-contain to control aspect ratio
+            - Use w-full or max-w-* to control width
+            - Use h-48, h-64, h-96, or max-h-* to limit height (don't make it too tall)
+            - Consider using rounded corners (rounded-lg, rounded-xl) for aesthetics
+            
+            Style the image appropriately with Tailwind CSS to fit the component's design.
+            Make sure the component fills its container (h-full w-full).
+
+            ${designSystem ? `DESIGN CONTEXT:\n${designSystem}\n` : ''}
+            Layout context: ${layoutContext}
+            
+            Current code:
+            ${currentCode}
+            
+            User request: ${userPrompt}
+          `;
+
+          const componentResponse = await genai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: componentPrompt,
+          });
+          
+          newCode = componentResponse.text.trim();
+        } else {
+          // If image generation failed, prompt for a fallback
+          const fallbackPrompt = `
+            You are an expert React and Tailwind CSS component editor.
+            Return the entire new component function only. DO NOT include exports, imports, or code fences.
+            Use Tailwind CSS for styling. Hooks and lucide icons are available in scope.
+
+            Image generation failed - show an error message with an icon instead.
+            Make sure the component fills its container (h-full w-full).
+
+            ${designSystem ? `DESIGN CONTEXT:\n${designSystem}\n` : ''}
+            Layout context: ${layoutContext}
+            
+            Current code:
+            ${currentCode}
+            
+            User request: ${userPrompt}
+          `;
+
+          const fallbackResponse = await genai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: fallbackPrompt,
+          });
+          
+          newCode = fallbackResponse.text.trim();
+        }
+      }
+
+      // Clean up markdown code fences
       const match = newCode.match(/```(?:jsx|javascript|js)?\n([\s\S]*?)\n```/);
       if (match) newCode = match[1];
       else newCode = newCode.replace(/```jsx|```/g, '');
@@ -269,20 +597,28 @@ export function useGridComponents() {
     setIsLoading(true);
     const generatedCode = await fetchGeminiCode(chatPrompt);
 
-    if (generatedCode) {
+      if (generatedCode) {
       const newId = `comp-${Date.now()}`;
+      
+      // Extract any image keys from the generated code
+      const imageKeys = [];
+      for (const [key, data] of imageCache.entries()) {
+        if (generatedCode.includes(data.url)) {
+          imageKeys.push(key);
+        }
+      }
+      
       const newComponent = {
         id: newId,
         code: generatedCode,
         isLocked: false,
         layout: { ...placeholderLayout, i: newId },
+        imageKeys, // Store image keys for restoration
       };
 
       setComponents((prev) => [...prev, newComponent]);
       setShowPlaceholder(false);
-    }
-
-    setChatPrompt('');
+    }    setChatPrompt('');
     setIsLoading(false);
   };
 
@@ -375,14 +711,26 @@ export function useGridComponents() {
 
   const handleModalSave = () => {
     setComponents((prev) =>
-      prev.map((c) =>
-        c.id === currentEditingId ? { ...c, code: currentEditingCode } : c
-      )
+      prev.map((c) => {
+        if (c.id === currentEditingId) {
+          // Extract any image keys from the updated code
+          const imageKeys = [];
+          for (const [key, data] of imageCache.entries()) {
+            if (currentEditingCode.includes(data.url)) {
+              imageKeys.push(key);
+            }
+          }
+          return { ...c, code: currentEditingCode, imageKeys };
+        }
+        return c;
+      })
     );
     handleModalClose();
   };
 
   const handleDeleteComponent = (id) => {
+    // Clean up any cached images for this component
+    cleanupImageCache(id);
     setComponents((prev) => prev.filter((c) => c.id !== id));
   };
 
@@ -398,7 +746,12 @@ export function useGridComponents() {
     setIsModalOpen(true);
   }
 
-  const clearAllComponents = () => {
+  const clearAllComponents = async () => {
+    // Clean up all cached images
+    for (const comp of components) {
+      await cleanupImageCache(comp.id);
+    }
+    await clearAllImages(); // Clear all from IndexedDB
     setComponents([]);
     setPlaceholderLayout({ i: 'placeholder', x: 0, y: 0, w: 4, h: 2 });
   };
