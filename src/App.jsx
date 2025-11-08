@@ -93,17 +93,25 @@ export default function App() {
         setIsSettingsOpen(false);
     };
     const mainRef = useRef(null);
+
+    // State to track the actual grid width for the modal
+    const [currentGridWidth, setCurrentGridWidth] = useState(1200);
+
     useEffect(() => {
         if (!mainRef.current) return;
 
         const observer = new ResizeObserver(entries => {
             if (entries[0]) {
-                setGridWidth(entries[0].target.clientWidth);
+                const width = entries[0].target.clientWidth;
+                setGridWidth(width);
+                setCurrentGridWidth(width);
             }
         });
 
         observer.observe(mainRef.current);
-        setGridWidth(mainRef.current.clientWidth);
+        const initialWidth = mainRef.current.clientWidth;
+        setGridWidth(initialWidth);
+        setCurrentGridWidth(initialWidth);
 
         return () => observer.disconnect();
     }, [setGridWidth]);
@@ -130,30 +138,37 @@ export default function App() {
             <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
                 <header className="flex-shrink-0 p-4 bg-gray-800 border-b border-gray-700 shadow-md z-10 flex items-center justify-between">
                     <h1 className="text-xl font-bold flex items-center gap-2">
-                        <Lucide.LayoutGrid /> AI Grid Builder
+                        <Lucide.LayoutGrid className="text-blue-500" /> AI Grid Builder
                     </h1>
                     <div className="flex gap-2">
                         <button
                             onClick={togglePreview}
                             disabled={components.length === 0}
-                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium text-sm flex items-center gap-2 transition-colors"
+                            // Kept blue as primary action, but refined colors
+                            className="px-3 py-1.5 rounded-lg hover:bg-blue-500 text-white font-medium text-sm flex items-center gap-2 transition-colors disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed"
                             title={isPreviewMode ? "Exit Preview" : "Preview"}
                         >
                             {isPreviewMode ? <Lucide.Edit size={16} /> : <Lucide.Eye size={16} />}
                             {isPreviewMode ? 'Edit Mode' : 'Preview'}
                         </button>
-                        <button
-                            onClick={clearAllComponents}
-                            className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-sm flex items-center gap-2 transition-colors"
-                            title="Clear all components"
-                        >
-                            <Lucide.Trash2 size={16} />
-                            Clear All
-                        </button>
+
+                        {!isPreviewMode && (
+                            <button
+                                onClick={clearAllComponents}
+                                // Now gray by default, red on hover
+                                className="px-3 py-1.5 rounded-lg hover:bg-red-600 text-gray-200 hover:text-white font-medium text-sm flex items-center gap-2 transition-colors"
+                                title="Clear all components"
+                            >
+                                <Lucide.Trash2 size={16} />
+                                Clear All
+                            </button>
+                        )}
+
                         <button
                             onClick={handleExport}
                             disabled={components.length === 0}
-                            className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium text-sm flex items-center gap-2 transition-colors"
+                            // Now gray by default, green on hover
+                            className="px-3 py-1.5 rounded-lg hover:bg-green-600 text-gray-200 hover:text-white font-medium text-sm flex items-center gap-2 transition-colors disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed"
                             title="Export as JSX"
                         >
                             <Lucide.Download size={16} />
@@ -162,9 +177,10 @@ export default function App() {
 
                         <button
                           onClick={() => setIsSettingsOpen(true)}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-gray-700"
+                          // Standardized to match the other gray buttons
+                          className="px-3 py-1.5 rounded-lg hover:bg-gray-600 text-gray-200 hover:text-white font-medium text-sm flex items-center gap-2 transition-colors"
                         >
-                        <Lucide.Settings size={18} />
+                        <Lucide.Settings size={16} />
                         Settings
                     </button>
                     </div>
@@ -218,6 +234,7 @@ export default function App() {
                     onSave={handleModalSave}
                     onEditCode={handleCodeEdit}
                     layout={currentEditingLayout}
+                    gridWidth={currentGridWidth} 
                 />
 
                 <SettingsModal
