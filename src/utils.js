@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'; // Added useEffect import
+import { useState, useEffect } from 'react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const API_KEY = import.meta.env.VITE_API_KEY;
@@ -108,6 +108,8 @@ export function useGridComponents() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentEditingCode, setCurrentEditingCode] = useState('');
   const [currentEditingId, setCurrentEditingId] = useState(null);
+  // NEW: Track the layout of the component being edited
+  const [currentEditingLayout, setCurrentEditingLayout] = useState(null); 
   const [isPreviewMode, setIsPreviewMode] = useState(false);
 
   useEffect(() => {
@@ -127,7 +129,7 @@ export function useGridComponents() {
       if (!saved) {
         const legacy = localStorage.getItem('gridly_design_system');
         return {
-          colors: { background: '', secondary: '', text: '' }, // Highlight changed to text here too just in case
+          colors: { background: '', secondary: '', text: '' },
           fonts: { primary: '', secondary: '' },
           customRules: legacy || '',
         };
@@ -143,7 +145,6 @@ export function useGridComponents() {
     }
   });
 
-  // NEW: Onboarding Effect
   useEffect(() => {
     const hasVisited = localStorage.getItem('gridly_has_visited');
     if (!hasVisited) {
@@ -152,7 +153,6 @@ export function useGridComponents() {
     }
   }, []);
 
-  // ...Tvst of the file remains exactly as you provided in your prompt
   const handleSaveSettings = (newSettings) => {
     setSettings(newSettings);
     localStorage.setItem('gridly_settings', JSON.stringify(newSettings));
@@ -164,7 +164,7 @@ export function useGridComponents() {
     const parts = [
       colors.background && `- Preferred background color: ${colors.background}`,
       colors.secondary && `- Secondary color: ${colors.secondary}`,
-      colors.text && `- Text color: ${colors.text}`, // Highlight changed to text
+      colors.text && `- Text color: ${colors.text}`,
       fonts.primary && `- Primary font family: ${fonts.primary}`,
       fonts.secondary && `- Secondary font family: ${fonts.secondary}`,
     ].filter(Boolean);
@@ -268,7 +268,6 @@ export function useGridComponents() {
   };
 
   const handlePromptSubmit = async (e) => {
-    // ...existing code...
     e.preventDefault();
     if (!chatPrompt || isLoading) return;
 
@@ -312,16 +311,12 @@ export function useGridComponents() {
   };
 
   const handleGridMouseDown = (e) => {
-    // Only start drawing if the click is on the grid background itself
     if (e.target.classList.contains('react-grid-layout') || e.target.classList.contains('layout')) {
       setIsDrawing(true);
       setShowPlaceholder(false);
       const rect = e.currentTarget.getBoundingClientRect();
-      
-      // Add scroll offsets for correct coordinates
       const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
       const y = e.clientY - rect.top + e.currentTarget.scrollTop; 
-      
       setDrawStart({ x, y });
       setDrawEnd({ x, y });
     }
@@ -330,11 +325,8 @@ export function useGridComponents() {
   const handleGridMouseMove = (e) => {
     if (!isDrawing) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    
-    // Add scroll offsets for correct coordinates
     const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
     const y = e.clientY - rect.top + e.currentTarget.scrollTop;
-
     setDrawEnd({ x, y });
   };
 
@@ -342,7 +334,7 @@ export function useGridComponents() {
     if (!isDrawing) return;
     setIsDrawing(false);
 
-    const rowHeight = 20; // Must match rowHeight in GridContainer
+    const rowHeight = 20;
     const cols = 12;
     const colWidth = gridWidth / cols;
 
@@ -382,6 +374,7 @@ export function useGridComponents() {
     setIsModalOpen(false);
     setCurrentEditingId(null);
     setCurrentEditingCode('');
+    setCurrentEditingLayout(null); // Clear layout on close
   };
 
   const handleModalSave = () => {
@@ -406,6 +399,7 @@ export function useGridComponents() {
   const openEditModal = (component) => {
     setCurrentEditingId(component.id);
     setCurrentEditingCode(component.code);
+    setCurrentEditingLayout(component.layout); // Set the layout when opening modal
     setIsModalOpen(true);
   }
 
@@ -439,19 +433,16 @@ export function useGridComponents() {
     setIsSettingsOpen,
     handleSaveSettings,
     currentEditingId,
+    currentEditingLayout, // Export this NEW state
     isDrawing,
     drawStart,
     drawEnd,
     showPlaceholder,
     isPreviewMode,
-    
-    // Setters
     setPlaceholderLayout,
     setChatPrompt,
     setCurrentEditingCode,
     setGridWidth,
-    
-    // Handlers
     handlePromptSubmit,
     handleLayoutChange,
     openEditModal,

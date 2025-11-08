@@ -6,11 +6,10 @@ import ChatBar from './components/ChatBar';
 import CodeEditModal from './components/CodeEditModal';
 import SettingsModal from './components/SettingsModal';
 import { useGridComponents } from './utils';
-import { DEFAULT_SETTINGS } from './settings'; // Import the new defaults file
+import { DEFAULT_SETTINGS } from './settings';
 import PreviewGrid from './components/PreviewGrid';
-// import ExportedGrid from './ExportedGrid';
 
-// Helper to calculate drawing box style, now with scroll correction
+// ... (getDrawingRect helper remains the same) ...
 function getDrawingRect(start, end, scrollTop = 0, scrollLeft = 0) {
     if (!start || !end) return { display: 'none' };
     
@@ -32,7 +31,6 @@ function getDrawingRect(start, end, scrollTop = 0, scrollLeft = 0) {
     };
 }
 
-
 export default function App() {
     const {
         components,
@@ -41,6 +39,7 @@ export default function App() {
         isLoading,
         isModalOpen,
         currentEditingCode,
+        currentEditingLayout,
         settings,
         isSettingsOpen,
         setIsSettingsOpen,
@@ -70,7 +69,8 @@ export default function App() {
         togglePreview,
         handleCancelPlaceholder,
     } = useGridComponents();
-
+    
+    // ... (rest of the component hooks remain the same) ...
     const [isFirstTime, setIsFirstTime] = useState(false);
 
     useEffect(() => {
@@ -80,19 +80,9 @@ export default function App() {
             setIsSettingsOpen(true);
         }
 
-        // --- NEW LOGIC HERE ---
-        // If the settings from the hook are falsy (null, undefined, etc.),
-        // it means they haven't been set yet. Let's save the defaults.
-        // This will update the `settings` state within your useGridComponents hook.
         if (!settings) {
             handleSaveSettings(DEFAULT_SETTINGS);
         }
-        
-        // We only want this effect to check for settings on the *initial* load.
-        // Adding `settings` to the dependency array would cause a re-check
-        // *after* saving, which is unnecessary.
-        // We also add the functions from the hook to satisfy the linter,
-        // assuming they are stable (e.g., wrapped in useCallback).
     }, [setIsSettingsOpen, settings, handleSaveSettings]);
 
     const handleSaveSettingsWrapper = (newSettings) => {
@@ -105,20 +95,25 @@ export default function App() {
         setIsSettingsOpen(false);
     };
     const mainRef = useRef(null);
+    
+    // We need to capture the actual current gridWidth to pass it down
+    const [currentGridWidth, setCurrentGridWidth] = useState(1200);
+
     useEffect(() => {
         if (!mainRef.current) return;
 
         const observer = new ResizeObserver(entries => {
             if (entries[0]) {
-                // Use clientWidth to exclude the scrollbar
-                setGridWidth(entries[0].target.clientWidth);
+                const width = entries[0].target.clientWidth;
+                setGridWidth(width);
+                setCurrentGridWidth(width); // Keep local state updated too
             }
         });
 
         observer.observe(mainRef.current);
-        
-        // Use clientWidth for the initial value
-        setGridWidth(mainRef.current.clientWidth);
+        const initialWidth = mainRef.current.clientWidth;
+        setGridWidth(initialWidth);
+        setCurrentGridWidth(initialWidth);
 
         return () => observer.disconnect();
     }, [setGridWidth]);
@@ -132,7 +127,7 @@ export default function App() {
                             linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
           background-size: 8.333333% 20px;
         }
-
+        /* ... other styles ... */
         .react-grid-item > .react-resizable-handle {
           z-index: 20;
         }
@@ -143,6 +138,7 @@ export default function App() {
       `}</style>
 
             <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
+                {/* ... Header ... */}
                 <header className="flex-shrink-0 p-4 bg-gray-800 border-b border-gray-700 shadow-md z-10 flex items-center justify-between">
                     <h1 className="text-xl font-bold flex items-center gap-2">
                         <Lucide.LayoutGrid /> AI Grid Builder
@@ -232,6 +228,8 @@ export default function App() {
                     setCode={setCurrentEditingCode}
                     onSave={handleModalSave}
                     onEditCode={handleCodeEdit}
+                    layout={currentEditingLayout}
+                    gridWidth={currentGridWidth} // NEW: Pass the actual grid width
                 />
 
                 <SettingsModal
