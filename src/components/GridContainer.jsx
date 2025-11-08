@@ -13,19 +13,41 @@ export default function GridContainer({
   onToggleLock,
   placeholderLayout,
   showPlaceholder,
+  onCancelPlaceholder,
 }) {
   const renderPlaceholder = (layout) => {
-    // --- THIS IS THE FIX ---
     // Hide text if width OR height is less than 3 units
     const isSmall = layout.w < 3 || layout.h < 3;
-    // --- END FIX ---
 
     return (
       <div
         key="placeholder"
-        className="bg-slate-800 rounded-lg border-2 border-dashed border-slate-500
+        className="relative bg-slate-800 rounded-lg border-2 border-dashed border-slate-500
                   flex items-center justify-center text-slate-500 cursor-move h-full w-full overflow-hidden"
       >
+        <div className="no-drag absolute top-2 right-2 z-50 pointer-events-auto">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onCancelPlaceholder();
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onMouseUp={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            className="p-1.5 bg-gray-900 text-slate-400 rounded-full hover:bg-red-600 hover:text-white 
+                       transition-colors shadow-lg border border-slate-600"
+            title="Cancel placeholder"
+          >
+            <Lucide.X size={16} />
+          </button>
+        </div>
+
         <div className="text-center">
           <Lucide.PlusCircle size={isSmall ? 24 : 32} className="mx-auto" />
 
@@ -52,7 +74,6 @@ export default function GridContainer({
       draggableCancel=".no-drag"
       compactType={null}
       preventCollision={true}
-      // --- FIX: Add margin and containerPadding ---
       margin={[0, 0]}
       containerPadding={[0, 0]}
     >

@@ -63,6 +63,7 @@ export default function App() {
         handleGridMouseMove,
         handleGridMouseUp,
         togglePreview,
+        handleCancelPlaceholder,
     } = useGridComponents();
 
     const mainRef = useRef(null);
@@ -71,7 +72,6 @@ export default function App() {
 
         const observer = new ResizeObserver(entries => {
             if (entries[0]) {
-                // --- THIS IS THE FIX ---
                 // Use clientWidth to exclude the scrollbar
                 setGridWidth(entries[0].target.clientWidth);
             }
@@ -79,7 +79,6 @@ export default function App() {
 
         observer.observe(mainRef.current);
         
-        // --- THIS IS THE FIX ---
         // Use clientWidth for the initial value
         setGridWidth(mainRef.current.clientWidth);
 
@@ -161,6 +160,7 @@ export default function App() {
                             placeholderLayout={placeholderLayout}
                             onPlaceholderLayoutChange={setPlaceholderLayout}
                             showPlaceholder={showPlaceholder}
+                            onCancelPlaceholder={handleCancelPlaceholder}
                         />
 
                         {isDrawing && mainRef.current && (

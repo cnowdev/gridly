@@ -305,21 +305,20 @@ export function useGridComponents() {
     setDrawEnd(null);
   };
 
-  const handleComponentClick = (component) => {
-    setCurrentEditingId(component.id);
-    setCurrentEditingCode(component.code);
-    setIsModalOpen(true);
+  const handleCancelPlaceholder = () => {
+    setShowPlaceholder(false);
+    setDrawStart(null);
+    setDrawEnd(null);
+    setPlaceholderLayout({ i: 'placeholder', x: 0, y: 0, w: 4, h: 2 });
   };
 
   const handleModalClose = () => {
-    // ...existing code...
     setIsModalOpen(false);
     setCurrentEditingId(null);
     setCurrentEditingCode('');
   };
 
   const handleModalSave = () => {
-    // ...existing code...
     setComponents((prev) => 
       prev.map((c) => 
         c.id === currentEditingId 
@@ -331,12 +330,10 @@ export function useGridComponents() {
   };
 
   const handleDeleteComponent = (id) => {
-    // ...existing code...
     setComponents((prev) => prev.filter((c) => c.id !== id));
   };
 
   const handleToggleLock = (id) => {
-    // ...existing code...
     setComponents((prev) => 
       prev.map((c) => 
         c.id === id 
@@ -347,14 +344,12 @@ export function useGridComponents() {
   };
 
   const openEditModal = (component) => {
-    // ...existing code...
     setCurrentEditingId(component.id);
     setCurrentEditingCode(component.code);
     setIsModalOpen(true);
   }
 
   const clearAllComponents = () => {
-    // ...existing code...
     setComponents([]);
     setPlaceholderLayout({ i: 'placeholder', x: 0, y: 0, w: 4, h: 2 });
   };
@@ -407,6 +402,7 @@ export function useGridComponents() {
     handleGridMouseDown,
     handleGridMouseMove,
     handleGridMouseUp,
+    handleCancelPlaceholder,
     togglePreview,
   };
 }
