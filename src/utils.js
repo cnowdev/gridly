@@ -81,7 +81,10 @@ export const downloadJSX = (jsxContent, filename = 'ExportedGrid.jsx') => {
 export function useGridComponents() {
   const savedState = loadState();
   
-  const [components, setComponents] = useState(savedState?.components || []);
+  const [history, setHistory] = useState([savedState?.components || []]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const components = history[historyIndex];
+
   const [placeholderLayout, setPlaceholderLayout] = useState(
     savedState?.placeholderLayout || { 
       i: 'placeholder', 
@@ -98,6 +101,7 @@ export function useGridComponents() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentEditingCode, setCurrentEditingCode] = useState('');
   const [currentEditingId, setCurrentEditingId] = useState(null);
+  const [currentEditingLayout, setCurrentEditingLayout] = useState(null); 
   const [isPreviewMode, setIsPreviewMode] = useState(false);
 
   // Image cache for storing blob URLs (runtime only)
@@ -114,7 +118,31 @@ export function useGridComponents() {
   const [drawStart, setDrawStart] = useState(null);
   const [drawEnd, setDrawEnd] = useState(null);
   const [showPlaceholder, setShowPlaceholder] = useState(false);
+  const [ignoreNextLayoutChange, setIgnoreNextLayoutChange] = useState(false);
 
+  // This function wraps our state setting to manage the history array.
+  const setComponentsWithHistory = (newComponentsOrFn) => {
+    const currentComponents = history[historyIndex];
+
+    // Resolve the new state (whether it's a value or a function)
+    const newComponents = typeof newComponentsOrFn === 'function' 
+      ? newComponentsOrFn(currentComponents)
+      : newComponentsOrFn;
+
+    // Deep-compare the new state with the current state.
+    // If they are the same, don't create a new history entry.
+    if (JSON.stringify(newComponents) === JSON.stringify(currentComponents)) {
+      return;
+    }
+
+    // Cut off the 'future' history if we've undone
+    const currentHistory = history.slice(0, historyIndex + 1);
+    
+    const newHistory = [...currentHistory, newComponents];
+    
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
 
   const [settings, setSettings] = useState(() => {
     try {
@@ -122,7 +150,7 @@ export function useGridComponents() {
       if (!saved) {
         const legacy = localStorage.getItem('gridly_design_system');
         return {
-          colors: { background: '', secondary: '', text: '' }, // Highlight changed to text here too just in case
+          colors: { background: '', secondary: '', text: '' },
           fonts: { primary: '', secondary: '' },
           customRules: legacy || '',
         };
@@ -138,7 +166,6 @@ export function useGridComponents() {
     }
   });
 
-  // NEW: Onboarding Effect
   useEffect(() => {
     const hasVisited = localStorage.getItem('gridly_has_visited');
     if (!hasVisited) {
@@ -147,7 +174,6 @@ export function useGridComponents() {
     }
   }, []);
 
-  // ...Tvst of the file remains exactly as you provided in your prompt
   const handleSaveSettings = (newSettings) => {
     setSettings(newSettings);
     localStorage.setItem('gridly_settings', JSON.stringify(newSettings));
@@ -159,7 +185,7 @@ export function useGridComponents() {
     const parts = [
       colors.background && `- Preferred background color: ${colors.background}`,
       colors.secondary && `- Secondary color: ${colors.secondary}`,
-      colors.text && `- Text color: ${colors.text}`, // Highlight changed to text
+      colors.text && `- Text color: ${colors.text}`,
       fonts.primary && `- Primary font family: ${fonts.primary}`,
       fonts.secondary && `- Secondary font family: ${fonts.secondary}`,
     ].filter(Boolean);
@@ -348,8 +374,8 @@ export function useGridComponents() {
 
     const systemPrompt = `
       You are an expert React and Tailwind CSS component generator.
-      
-      IF the user's request requires an AI-generated image (photo, illustration, graphic, etc.):
+
+      ONLY IF the user is EXPLICITLY asking for an AI-generated image (photo, illustration, graphic, etc.):
         - Respond with exactly: IMAGE_REQUEST: [detailed, descriptive prompt for image generation]
         - Make the image prompt detailed and specific
         - ONLY do this if they need a realistic photo/illustration, NOT for icons or simple graphics
@@ -462,32 +488,50 @@ export function useGridComponents() {
   };
 
   const handleCodeEdit = async (currentCode, userPrompt) => {
+    let currentComponentContext = '';
     const currentComponent = components.find((c) => c.id === currentEditingId);
-    let layoutContext = '';
+    
 
     if (currentComponent) {
       const { w, h } = currentComponent.layout;
-      layoutContext = `The component's container on the grid has a width of ${w} units and a height of ${h} units.`;
+      currentComponentContext = `The component you are editing (ID: "${currentEditingId}") is in a container with grid width ${w} and grid height ${h}.`;
     }
+
+    const otherComponentsContext = components
+      .filter(c => c.id !== currentEditingId) // Get all *other* components
+      .map(c => `  - Component ID: "${c.id}" (Layout: x: ${c.layout.x}, y: ${c.layout.y}, w: ${c.layout.w}, h: ${c.layout.h})`)
+      .join('\n');
+    
+    // Combine all grid context into one block
+    const gridContext = `
+GRID CONTEXT:
+${currentComponentContext}
+${otherComponentsContext.length > 0 ? `
+Here are the other components on the grid (the user may refer to them by ID):
+${otherComponentsContext}
+` : ''}
+    `;
 
     const designSystem = getDesignSystemPrompt();
 
     const editPrompt = `
-      IF the user is asking for an AI-generated image, photo, illustration, graphic, or visual asset to be added/changed:
+      ONLY IF the user is EXPLICITLY asking for an AI-generated image, photo, illustration, graphic, or visual asset to be added/changed:
         - Respond with exactly: IMAGE_REQUEST: [detailed, descriptive prompt for image generation]
         - Make the image prompt detailed and specific
       
       OTHERWISE:
       You are an expert React and Tailwind CSS component editor.
       Return the entire new component function only. DO NOT include exports, imports, or code fences.
-      Use Tailwind CSS for styling. Hooks and lucide icons are available in scope. When using Lucide icons, use
-      Lucide.IconName (e.g., <Lucide.User />).
+      Use Tailwind CSS for styling. Hooks are available in scope. All Lucide icons are available under 
+      the 'Lucide' namespace (e.g., <Lucide.User />, <Lucide.Bell />, etc).
 
       ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ''}
 
-      Layout context: ${layoutContext}
-      Current code:
+      ${gridContext} 
+
+      Current code (for component "${currentEditingId}"):
       ${currentCode}
+
       User request: ${userPrompt}
     `;
 
@@ -585,7 +629,6 @@ export function useGridComponents() {
   };
 
   const handlePromptSubmit = async (e) => {
-    // ...existing code...
     e.preventDefault();
     if (!chatPrompt || isLoading) return;
 
@@ -616,9 +659,13 @@ export function useGridComponents() {
         imageKeys, // Store image keys for restoration
       };
 
-      setComponents((prev) => [...prev, newComponent]);
+      setComponentsWithHistory((prev) => [...prev, newComponent]);
       setShowPlaceholder(false);
-    }    setChatPrompt('');
+      // Ignore the next layout change from React Grid Layout's automatic positioning
+      setIgnoreNextLayoutChange(true);
+    }
+
+    setChatPrompt('');
     setIsLoading(false);
   };
 
@@ -628,25 +675,75 @@ export function useGridComponents() {
       setPlaceholderLayout(placeholder);
     }
     
-    setComponents((prevComps) =>
-      prevComps.map((comp) => {
+    // If we should ignore this layout change (e.g., right after adding a component)
+    if (ignoreNextLayoutChange) {
+      setIgnoreNextLayoutChange(false);
+      
+      // Still update the components array, but don't create history entry
+      const updatedComps = components.map((comp) => {
         const newLayout = newLayouts.find((l) => l.i === comp.id);
-        return newLayout ? { ...comp, layout: newLayout } : comp;
-      })
-    );
+        if (newLayout) {
+          return { 
+            ...comp, 
+            layout: {
+              i: newLayout.i,
+              x: newLayout.x,
+              y: newLayout.y,
+              w: newLayout.w,
+              h: newLayout.h,
+            }
+          };
+        }
+        return comp;
+      });
+      
+      // Update the state directly without going through history
+      setHistory(prev => {
+        const newHistory = [...prev];
+        newHistory[historyIndex] = updatedComps;
+        return newHistory;
+      });
+      return;
+    }
+    
+    // Check if anything actually changed before calling setComponentsWithHistory
+    let hasChanges = false;
+    
+    const updatedComps = components.map((comp) => {
+      const newLayout = newLayouts.find((l) => l.i === comp.id);
+
+      if (newLayout) {
+        // Normalize the layout object to only the properties we use.
+        const newNormalizedLayout = {
+          i: newLayout.i,
+          x: newLayout.x,
+          y: newLayout.y,
+          w: newLayout.w,
+          h: newLayout.h,
+        };
+
+        // Check if the layout actually changed
+        if (JSON.stringify(comp.layout) !== JSON.stringify(newNormalizedLayout)) {
+          hasChanges = true;
+          return { ...comp, layout: newNormalizedLayout };
+        }
+      }
+      return comp;
+    });
+
+    // Only update history if something actually changed
+    if (hasChanges) {
+      setComponentsWithHistory(updatedComps);
+    }
   };
 
   const handleGridMouseDown = (e) => {
-    // Only start drawing if the click is on the grid background itself
     if (e.target.classList.contains('react-grid-layout') || e.target.classList.contains('layout')) {
       setIsDrawing(true);
       setShowPlaceholder(false);
       const rect = e.currentTarget.getBoundingClientRect();
-      
-      // Add scroll offsets for correct coordinates
       const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
       const y = e.clientY - rect.top + e.currentTarget.scrollTop; 
-      
       setDrawStart({ x, y });
       setDrawEnd({ x, y });
     }
@@ -655,11 +752,8 @@ export function useGridComponents() {
   const handleGridMouseMove = (e) => {
     if (!isDrawing) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    
-    // Add scroll offsets for correct coordinates
     const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
     const y = e.clientY - rect.top + e.currentTarget.scrollTop;
-
     setDrawEnd({ x, y });
   };
 
@@ -667,7 +761,7 @@ export function useGridComponents() {
     if (!isDrawing) return;
     setIsDrawing(false);
 
-    const rowHeight = 20; // Must match rowHeight in GridContainer
+    const rowHeight = 20;
     const cols = 12;
     const colWidth = gridWidth / cols;
 
@@ -707,10 +801,11 @@ export function useGridComponents() {
     setIsModalOpen(false);
     setCurrentEditingId(null);
     setCurrentEditingCode('');
+    setCurrentEditingLayout(null); // Clear layout on close
   };
 
   const handleModalSave = () => {
-    setComponents((prev) =>
+    setComponentsWithHistory((prev) =>
       prev.map((c) => {
         if (c.id === currentEditingId) {
           // Extract any image keys from the updated code
@@ -731,11 +826,31 @@ export function useGridComponents() {
   const handleDeleteComponent = (id) => {
     // Clean up any cached images for this component
     cleanupImageCache(id);
-    setComponents((prev) => prev.filter((c) => c.id !== id));
+    setComponentsWithHistory((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const handleDuplicateComponent = (id) => {
+    const componentToDuplicate = components.find((c) => c.id === id);
+    if (!componentToDuplicate) return;
+
+    const newId = `comp-${Date.now()}`;
+    const newComponent = {
+      id: newId,
+      code: componentToDuplicate.code,
+      isLocked: false,
+      layout: {
+        ...componentToDuplicate.layout, // Copes w, h, etc.
+        i: newId, // Set new unique ID for the layout
+        // Place it just below the original. RGL will handle collisions.
+        y: componentToDuplicate.layout.y + componentToDuplicate.layout.h,
+      },
+    };
+
+    setComponentsWithHistory((prev) => [...prev, newComponent]);
   };
 
   const handleToggleLock = (id) => {
-    setComponents((prev) =>
+    setComponentsWithHistory((prev) =>
       prev.map((c) => (c.id === id ? { ...c, isLocked: !c.isLocked } : c))
     );
   };
@@ -743,6 +858,7 @@ export function useGridComponents() {
   const openEditModal = (component) => {
     setCurrentEditingId(component.id);
     setCurrentEditingCode(component.code);
+    setCurrentEditingLayout(component.layout); // Set the layout when opening modal
     setIsModalOpen(true);
   }
 
@@ -752,8 +868,16 @@ export function useGridComponents() {
       await cleanupImageCache(comp.id);
     }
     await clearAllImages(); // Clear all from IndexedDB
-    setComponents([]);
+    setComponentsWithHistory([]);
     setPlaceholderLayout({ i: 'placeholder', x: 0, y: 0, w: 4, h: 2 });
+  };
+
+  const handleUndo = () => {
+    setHistoryIndex(prevIndex => Math.max(0, prevIndex - 1));
+  };
+
+  const handleRedo = () => {
+    setHistoryIndex(prevIndex => Math.min(history.length - 1, prevIndex + 1));
   };
 
   const handleExport = () => {
@@ -781,25 +905,23 @@ export function useGridComponents() {
     setIsSettingsOpen,
     handleSaveSettings,
     currentEditingId,
+    currentEditingLayout, // Export this NEW state
     isDrawing,
     drawStart,
     drawEnd,
     showPlaceholder,
     isPreviewMode,
-    
-    // Setters
     setPlaceholderLayout,
     setChatPrompt,
     setCurrentEditingCode,
     setGridWidth,
-    
-    // Handlers
     handlePromptSubmit,
     handleLayoutChange,
     openEditModal,
     handleModalClose,
     handleModalSave,
     handleDeleteComponent,
+    handleDuplicateComponent,
     handleToggleLock,
     handleCodeEdit,
     clearAllComponents,
@@ -809,5 +931,9 @@ export function useGridComponents() {
     handleGridMouseUp,
     handleCancelPlaceholder,
     togglePreview,
+    handleUndo,
+    handleRedo,
+    canUndo: historyIndex > 0,
+    canRedo: historyIndex < history.length - 1,
   };
 }

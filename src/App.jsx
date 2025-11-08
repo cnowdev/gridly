@@ -6,11 +6,9 @@ import ChatBar from './components/ChatBar';
 import CodeEditModal from './components/CodeEditModal';
 import SettingsModal from './components/SettingsModal';
 import { useGridComponents } from './utils';
-import { DEFAULT_SETTINGS } from './settings'; // Import the new defaults file
+import { DEFAULT_SETTINGS } from './settings';
 import PreviewGrid from './components/PreviewGrid';
-// import ExportedGrid from './ExportedGrid';
 
-// Helper to calculate drawing box style, now with scroll correction
 function getDrawingRect(start, end, scrollTop = 0, scrollLeft = 0) {
     if (!start || !end) return { display: 'none' };
     
@@ -32,7 +30,6 @@ function getDrawingRect(start, end, scrollTop = 0, scrollLeft = 0) {
     };
 }
 
-
 export default function App() {
     const {
         components,
@@ -41,6 +38,7 @@ export default function App() {
         isLoading,
         isModalOpen,
         currentEditingCode,
+        currentEditingLayout,
         settings,
         isSettingsOpen,
         setIsSettingsOpen,
@@ -69,8 +67,13 @@ export default function App() {
         handleGridMouseUp,
         togglePreview,
         handleCancelPlaceholder,
+        handleDuplicateComponent,
+        handleUndo,
+        handleRedo,
+        canUndo,
+        canRedo,
     } = useGridComponents();
-
+    
     const [isFirstTime, setIsFirstTime] = useState(false);
 
     useEffect(() => {
@@ -80,19 +83,9 @@ export default function App() {
             setIsSettingsOpen(true);
         }
 
-        // --- NEW LOGIC HERE ---
-        // If the settings from the hook are falsy (null, undefined, etc.),
-        // it means they haven't been set yet. Let's save the defaults.
-        // This will update the `settings` state within your useGridComponents hook.
         if (!settings) {
             handleSaveSettings(DEFAULT_SETTINGS);
         }
-        
-        // We only want this effect to check for settings on the *initial* load.
-        // Adding `settings` to the dependency array would cause a re-check
-        // *after* saving, which is unnecessary.
-        // We also add the functions from the hook to satisfy the linter,
-        // assuming they are stable (e.g., wrapped in useCallback).
     }, [setIsSettingsOpen, settings, handleSaveSettings]);
 
     const handleSaveSettingsWrapper = (newSettings) => {
@@ -105,20 +98,25 @@ export default function App() {
         setIsSettingsOpen(false);
     };
     const mainRef = useRef(null);
+    
+    // We need to capture the actual current gridWidth to pass it down
+    const [currentGridWidth, setCurrentGridWidth] = useState(1200);
+
     useEffect(() => {
         if (!mainRef.current) return;
 
         const observer = new ResizeObserver(entries => {
             if (entries[0]) {
-                // Use clientWidth to exclude the scrollbar
-                setGridWidth(entries[0].target.clientWidth);
+                const width = entries[0].target.clientWidth;
+                setGridWidth(width);
+                setCurrentGridWidth(width); // Keep local state updated too
             }
         });
 
         observer.observe(mainRef.current);
-        
-        // Use clientWidth for the initial value
-        setGridWidth(mainRef.current.clientWidth);
+        const initialWidth = mainRef.current.clientWidth;
+        setGridWidth(initialWidth);
+        setCurrentGridWidth(initialWidth);
 
         return () => observer.disconnect();
     }, [setGridWidth]);
@@ -132,7 +130,7 @@ export default function App() {
                             linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
           background-size: 8.333333% 20px;
         }
-
+        /* ... other styles ... */
         .react-grid-item > .react-resizable-handle {
           z-index: 20;
         }
@@ -143,32 +141,40 @@ export default function App() {
       `}</style>
 
             <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
+                {/* ... Header ... */}
                 <header className="flex-shrink-0 p-4 bg-gray-800 border-b border-gray-700 shadow-md z-10 flex items-center justify-between">
                     <h1 className="text-xl font-bold flex items-center gap-2">
-                        <Lucide.LayoutGrid /> AI Grid Builder
+                        <Lucide.LayoutGrid className="text-blue-500" /> AI Grid Builder
                     </h1>
                     <div className="flex gap-2">
                         <button
                             onClick={togglePreview}
                             disabled={components.length === 0}
-                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium text-sm flex items-center gap-2 transition-colors"
+                            // Kept blue as primary action, but refined colors
+                            className="px-3 py-1.5 rounded-lg hover:bg-blue-500 text-white font-medium text-sm flex items-center gap-2 transition-colors disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed"
                             title={isPreviewMode ? "Exit Preview" : "Preview"}
                         >
                             {isPreviewMode ? <Lucide.Edit size={16} /> : <Lucide.Eye size={16} />}
                             {isPreviewMode ? 'Edit Mode' : 'Preview'}
                         </button>
-                        <button
-                            onClick={clearAllComponents}
-                            className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-sm flex items-center gap-2 transition-colors"
-                            title="Clear all components"
-                        >
-                            <Lucide.Trash2 size={16} />
-                            Clear All
-                        </button>
+
+                        {!isPreviewMode && (
+                            <button
+                                onClick={clearAllComponents}
+                                // Now gray by default, red on hover
+                                className="px-3 py-1.5 rounded-lg hover:bg-red-600 text-gray-200 hover:text-white font-medium text-sm flex items-center gap-2 transition-colors"
+                                title="Clear all components"
+                            >
+                                <Lucide.Trash2 size={16} />
+                                Clear All
+                            </button>
+                        )}
+
                         <button
                             onClick={handleExport}
                             disabled={components.length === 0}
-                            className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium text-sm flex items-center gap-2 transition-colors"
+                            // Now gray by default, green on hover
+                            className="px-3 py-1.5 rounded-lg hover:bg-green-600 text-gray-200 hover:text-white font-medium text-sm flex items-center gap-2 transition-colors disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed"
                             title="Export as JSX"
                         >
                             <Lucide.Download size={16} />
@@ -177,11 +183,31 @@ export default function App() {
 
                         <button
                           onClick={() => setIsSettingsOpen(true)}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium hover:bg-gray-700"
+                          // Standardized to match the other gray buttons
+                          className="px-3 py-1.5 rounded-lg hover:bg-gray-600 text-gray-200 hover:text-white font-medium text-sm flex items-center gap-2 transition-colors"
                         >
-                        <Lucide.Settings size={18} />
+                        <Lucide.Settings size={16} />
                         Settings
                     </button>
+
+                    <div className="flex items-center gap-px rounded-lg overflow-hidden bg-gray-700 ring-1 ring-gray-600">
+                      <button
+                        onClick={handleUndo}
+                        disabled={!canUndo}
+                        className="p-2 text-white hover:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed"
+                        title="Undo (Ctrl+Z)"
+                      >
+                        <Lucide.Undo size={18} />
+                      </button>
+                      <button
+                        onClick={handleRedo}
+                        disabled={!canRedo}
+                        className="p-2 text-white hover:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed"
+                        title="Redo (Ctrl+Y)"
+                      >
+                        <Lucide.Redo size={18} />
+                      </button>
+                    </div>
                     </div>
                 </header>
 
@@ -207,6 +233,7 @@ export default function App() {
                             onPlaceholderLayoutChange={setPlaceholderLayout}
                             showPlaceholder={showPlaceholder}
                             onCancelPlaceholder={handleCancelPlaceholder}
+                            onDuplicateComponent={handleDuplicateComponent}
                         />
 
                         {isDrawing && mainRef.current && (
@@ -232,6 +259,8 @@ export default function App() {
                     setCode={setCurrentEditingCode}
                     onSave={handleModalSave}
                     onEditCode={handleCodeEdit}
+                    layout={currentEditingLayout}
+                    gridWidth={currentGridWidth}
                 />
 
                 <SettingsModal
