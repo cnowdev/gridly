@@ -1,18 +1,7 @@
 import { useState, useEffect } from 'react'; // Added useEffect import
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import genai from './lib/genai';
 
-const API_KEY = import.meta.env.VITE_API_KEY;
 
-let genAI;
-let model;
-if (API_KEY) {
-  genAI = new GoogleGenerativeAI(API_KEY);
-  model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
-} 
-
-if (!API_KEY) {
-  console.error("VITE_API_KEY is not set. Please add it to your .env file.");
-}
 
 // LocalStorage key
 const STORAGE_KEY = 'gridly-state';
@@ -177,7 +166,7 @@ export function useGridComponents() {
   };
 
   const fetchGeminiCode = async (prompt) => {
-    if (!model) {
+    if (!genai) {
       alert('Gemini API Key is not set in .env file.');
       return '() => <div className="text-red-500 p-4">Error: Please set your API key in .env</div>';
     }
@@ -207,9 +196,11 @@ export function useGridComponents() {
     const fullPrompt = `${systemPrompt}\n\nUser prompt: ${prompt}`;
 
     try {
-      const result = await model.generateContent(fullPrompt);
-      const response = await result.response;
-      let code = response.text();
+      const response = await genai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: fullPrompt,
+      });
+      let code = response.text;
 
       const match = code.match(/```(?:jsx|javascript|js)?\n([\s\S]*?)\n```/);
       if (match) code = match[1];
@@ -223,10 +214,6 @@ export function useGridComponents() {
   };
 
   const handleCodeEdit = async (currentCode, userPrompt) => {
-    if (!model) {
-      alert('Gemini API Key is not set in .env file.');
-      return currentCode;
-    }
     const currentComponent = components.find((c) => c.id === currentEditingId);
     let layoutContext = '';
 
@@ -252,9 +239,11 @@ export function useGridComponents() {
     `;
 
     try {
-      const result = await model.generateContent(editPrompt);
-      const response = await result.response;
-      let newCode = response.text();
+      const response = await genai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: editPrompt,
+      });
+      let newCode = response.text;
 
       const match = newCode.match(/```(?:jsx|javascript|js)?\n([\s\S]*?)\n```/);
       if (match) newCode = match[1];
