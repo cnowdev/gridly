@@ -19,7 +19,7 @@ export default function App() {
         setCurrentEditingCode,
         handlePromptSubmit,
         handleLayoutChange,
-        handleComponentClick,
+        openEditModal,
         handleModalClose,
         handleModalSave,
         handleDeleteComponent,
@@ -57,8 +57,8 @@ export default function App() {
                     <GridContainer
                         components={components}
                         onLayoutChange={handleLayoutChange}
-                        onComponentClick={handleComponentClick}
                         onDeleteComponent={handleDeleteComponent}
+                        openEditModal={openEditModal}
                         onToggleLock={handleToggleLock}
                         placeholderLayout={placeholderLayout}
                         onPlaceholderLayoutChange={setPlaceholderLayout}

@@ -8,7 +8,7 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 export default function GridContainer({
   components,
   onLayoutChange,
-  onComponentClick,
+  openEditModal,
   onDeleteComponent,
   onToggleLock,
   placeholderLayout,
@@ -58,7 +58,7 @@ export default function GridContainer({
                       ${comp.isLocked ? 'ring-2 ring-blue-500' : ''}`}
         >
           <div className="h-full w-full">
-            <DynamicComponent code={comp.code} onClick={() => onComponentClick(comp)} />
+            <DynamicComponent code={comp.code} />
           </div>
 
           <div
@@ -83,7 +83,7 @@ export default function GridContainer({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onComponentClick(comp);
+                  openEditModal(comp);
                 }}
                 className="p-1.5 bg-gray-800/70 text-white rounded-md
                            hover:bg-blue-600 hover:text-white transition-colors"

@@ -134,12 +134,6 @@ export function useGridComponents() {
     );
   };
 
-  const handleComponentClick = (component) => {
-    setCurrentEditingId(component.id);
-    setCurrentEditingCode(component.code);
-    setIsModalOpen(true);
-  };
-
   const handleModalClose = () => {
     setIsModalOpen(false);
     setCurrentEditingId(null);
@@ -171,6 +165,12 @@ export function useGridComponents() {
     );
   };
 
+  const openEditModal = (component) => {
+    setCurrentEditingId(component.id);
+    setCurrentEditingCode(component.code);
+    setIsModalOpen(true);
+  }
+
   return {
     // State
     components,
@@ -189,7 +189,7 @@ export function useGridComponents() {
     // Handlers
     handlePromptSubmit,
     handleLayoutChange,
-    handleComponentClick,
+    openEditModal,
     handleModalClose,
     handleModalSave,
     handleDeleteComponent,
