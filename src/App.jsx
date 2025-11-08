@@ -9,7 +9,6 @@ import { useGridComponents } from './utils';
 import { DEFAULT_SETTINGS } from './settings';
 import PreviewGrid from './components/PreviewGrid';
 
-// ... (getDrawingRect helper remains the same) ...
 function getDrawingRect(start, end, scrollTop = 0, scrollLeft = 0) {
     if (!start || !end) return { display: 'none' };
     
@@ -69,8 +68,7 @@ export default function App() {
         togglePreview,
         handleCancelPlaceholder,
     } = useGridComponents();
-    
-    // ... (rest of the component hooks remain the same) ...
+
     const [isFirstTime, setIsFirstTime] = useState(false);
 
     useEffect(() => {
@@ -95,25 +93,17 @@ export default function App() {
         setIsSettingsOpen(false);
     };
     const mainRef = useRef(null);
-    
-    // We need to capture the actual current gridWidth to pass it down
-    const [currentGridWidth, setCurrentGridWidth] = useState(1200);
-
     useEffect(() => {
         if (!mainRef.current) return;
 
         const observer = new ResizeObserver(entries => {
             if (entries[0]) {
-                const width = entries[0].target.clientWidth;
-                setGridWidth(width);
-                setCurrentGridWidth(width); // Keep local state updated too
+                setGridWidth(entries[0].target.clientWidth);
             }
         });
 
         observer.observe(mainRef.current);
-        const initialWidth = mainRef.current.clientWidth;
-        setGridWidth(initialWidth);
-        setCurrentGridWidth(initialWidth);
+        setGridWidth(mainRef.current.clientWidth);
 
         return () => observer.disconnect();
     }, [setGridWidth]);
@@ -127,7 +117,7 @@ export default function App() {
                             linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
           background-size: 8.333333% 20px;
         }
-        /* ... other styles ... */
+
         .react-grid-item > .react-resizable-handle {
           z-index: 20;
         }
@@ -138,7 +128,6 @@ export default function App() {
       `}</style>
 
             <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
-                {/* ... Header ... */}
                 <header className="flex-shrink-0 p-4 bg-gray-800 border-b border-gray-700 shadow-md z-10 flex items-center justify-between">
                     <h1 className="text-xl font-bold flex items-center gap-2">
                         <Lucide.LayoutGrid /> AI Grid Builder
@@ -190,7 +179,7 @@ export default function App() {
                     className="flex-grow overflow-auto relative"
                 >
                     {isPreviewMode ? (
-                        <PreviewGrid components={components} />
+                        <PreviewGrid components={components} settings={settings} />
                     ) : (
                         <>
                         <GridContainer
@@ -229,7 +218,6 @@ export default function App() {
                     onSave={handleModalSave}
                     onEditCode={handleCodeEdit}
                     layout={currentEditingLayout}
-                    gridWidth={currentGridWidth} // NEW: Pass the actual grid width
                 />
 
                 <SettingsModal
