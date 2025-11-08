@@ -111,7 +111,7 @@ export default function CodeEditModal({ isOpen, onClose, code, setCode, onSave, 
     useEffect: React.useEffect,
     useCallback: React.useCallback,
     useRef: React.useRef,
-    Lucide,
+    Lucide: Lucide,
   };
 
   return (

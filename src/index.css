@@ -42,6 +42,8 @@
   bottom: 0;
   right: 0;
   cursor: se-resize;
+  /* CRITICAL FIX: High z-index to ensure it appears above generated content */
+  z-index: 9999;
 }
 .react-grid-item > .react-resizable-handle::after {
   content: "";

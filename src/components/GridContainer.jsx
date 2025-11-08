@@ -10,7 +10,6 @@ import {
   Copy,
 } from "lucide-react";
 import DynamicComponent from "./DynamicComponent";
-import { createPortal } from "react-dom";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -264,7 +263,7 @@ export default function GridContainer({
 
           {/* If placeholder is short, show an external cancel button to match small-component UX (hidden until hover) */}
           {placeholderLayout.h < 4 && (
-            <div className="absolute -top-3 -right-3 z-50 opacity-0 group-hover:opacity-100 transition-all duration-150 transform-gpu pointer-events-none group-hover:pointer-events-auto">
+            <div className="absolute -top-3 -right-3 z-[9999] opacity-0 group-hover:opacity-100 transition-all duration-150 transform-gpu pointer-events-none group-hover:pointer-events-auto">
               <button
                 onClick={(e) => {
                   e.preventDefault();
