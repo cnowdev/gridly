@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'; // Added useEffect import
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const API_KEY = import.meta.env.VITE_API_KEY;
 

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import * as Lucide from 'lucide-react';
 
 import GridContainer from './components/GridContainer';
@@ -219,11 +219,6 @@ export default function App() {
                         )}
                         </>
                     )}
-
-       
-
-
-
                 </main>
 
                 {!isPreviewMode && (

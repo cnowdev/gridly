@@ -1,5 +1,6 @@
 import React from 'react';
 import DynamicComponent from './DynamicComponent';
+import * as Lucide from 'lucide-react';
 
 export default function PreviewGrid({ components }) {
   return (
