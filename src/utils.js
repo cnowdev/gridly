@@ -34,8 +34,52 @@ const saveState = (components, placeholderLayout) => {
   }
 };
 
+// Export grid as JSX component
+export const exportGridAsJSX = (components) => {
+  const jsx = `import React, { useState, useEffect, useRef } from 'react';
+import * as Lucide from 'lucide-react';
+
+${components.map((comp, idx) => `// Component ${idx + 1}
+const Component${idx} = ${comp.code};
+`).join('\n')}
+
+export default function ExportedGrid() {
+  return (
+    <div className="grid grid-cols-12 min-h-screen bg-gray-900">
+${components.map((comp, idx) => {
+      const { x, y, w, h } = comp.layout;
+      return `      <div 
+        style={{ 
+          gridColumn: '${x + 1} / span ${w}',
+          gridRow: '${y + 1} / span ${h}'
+        }}
+      >
+        <Component${idx} />
+      </div>`;
+    }).join('\n')}
+    </div>
+  );
+}
+`;
+
+  return jsx;
+};
+
+// Download JSX file
+export const downloadJSX = (jsxContent, filename = 'ExportedGrid.jsx') => {
+  const blob = new Blob([jsxContent], { type: 'text/javascript' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 export function useGridComponents() {
-  // Initialize state from localStorage or use defaults
+  // ...existing code...
   const savedState = loadState();
   
   const [components, setComponents] = useState(savedState?.components || []);
@@ -54,12 +98,14 @@ export function useGridComponents() {
   const [currentEditingCode, setCurrentEditingCode] = useState('');
   const [currentEditingId, setCurrentEditingId] = useState(null);
 
-  // Persist state whenever components or placeholderLayout changes
+  // ...existing code...
+
   useEffect(() => {
     saveState(components, placeholderLayout);
   }, [components, placeholderLayout]);
 
   const fetchGeminiCode = async (prompt) => {
+    // ...existing code...
     if (!API_KEY) {
       alert('Please add your Gemini API Key to .env');
       return '() => <div className="text-red-500 p-4">Error: Please set your API key in .env</div>';
@@ -76,6 +122,7 @@ export function useGridComponents() {
       - The component should be self-contained and responsive, filling its container (use 'h-full w-full').
       - React hooks like 'useState', 'useEffect', and 'useRef' are available in scope.
       - Assume 'lucide-react' icons are available in scope.
+      - When using Lucide icons, use Lucide.IconName (e.g., <Lucide.User />).
       - Respond ONLY with the raw component function:
         () => <div ... />  or  () => { const [s, setS] = useState(); return <div .../> }
     `;
@@ -101,6 +148,7 @@ export function useGridComponents() {
   };
 
   const handleCodeEdit = async (currentCode, userPrompt) => {
+    // ...existing code...
     const currentComponent = components.find((c) => c.id === currentEditingId);
     let layoutContext = '';
 
@@ -112,7 +160,8 @@ export function useGridComponents() {
     const editPrompt = `
       You are an expert React and Tailwind CSS component editor.
       Return the entire new component function only. DO NOT include exports, imports, or code fences.
-      Use Tailwind CSS for styling. Hooks and lucide icons are available in scope.
+      Use Tailwind CSS for styling. Hooks and lucide icons are available in scope. When using Lucide icons, use
+      Lucide.IconName (e.g., <Lucide.User />).
 
       Layout context: ${layoutContext}
 
@@ -125,7 +174,7 @@ export function useGridComponents() {
     try {
       const result = await genAI.models.generateContent({ 
         model: 'gemini-2.5-flash', 
-        prompt: editPrompt 
+        contents: editPrompt 
       });
       let newCode = result.text;
 
@@ -141,6 +190,7 @@ export function useGridComponents() {
   };
 
   const handlePromptSubmit = async (e) => {
+    // ...existing code...
     e.preventDefault();
     if (!chatPrompt || isLoading) return;
 
@@ -166,6 +216,7 @@ export function useGridComponents() {
   };
 
   const handleLayoutChange = (newLayouts) => {
+    // ...existing code...
     setComponents((prevComps) =>
       prevComps.map((comp) => {
         const newLayout = newLayouts.find((l) => l.i === comp.id);
@@ -175,12 +226,14 @@ export function useGridComponents() {
   };
 
   const handleModalClose = () => {
+    // ...existing code...
     setIsModalOpen(false);
     setCurrentEditingId(null);
     setCurrentEditingCode('');
   };
 
   const handleModalSave = () => {
+    // ...existing code...
     setComponents((prev) => 
       prev.map((c) => 
         c.id === currentEditingId 
@@ -192,10 +245,12 @@ export function useGridComponents() {
   };
 
   const handleDeleteComponent = (id) => {
+    // ...existing code...
     setComponents((prev) => prev.filter((c) => c.id !== id));
   };
 
   const handleToggleLock = (id) => {
+    // ...existing code...
     setComponents((prev) => 
       prev.map((c) => 
         c.id === id 
@@ -206,14 +261,25 @@ export function useGridComponents() {
   };
 
   const openEditModal = (component) => {
+    // ...existing code...
     setCurrentEditingId(component.id);
     setCurrentEditingCode(component.code);
     setIsModalOpen(true);
   }
 
   const clearAllComponents = () => {
+    // ...existing code...
     setComponents([]);
     setPlaceholderLayout({ i: 'placeholder', x: 0, y: 0, w: 4, h: 2 });
+  };
+
+  const handleExport = () => {
+    if (components.length === 0) {
+      alert('No components to export!');
+      return;
+    }
+    const jsx = exportGridAsJSX(components);
+    downloadJSX(jsx);
   };
 
   return {
@@ -241,5 +307,6 @@ export function useGridComponents() {
     handleToggleLock,
     handleCodeEdit,
     clearAllComponents,
+    handleExport,
   };
 }
