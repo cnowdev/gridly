@@ -31,8 +31,20 @@ export default function CodeEditModal({ isOpen, onClose, code, setCode, onSave, 
     useEffect: React.useEffect,
     useCallback: React.useCallback,
     useRef: React.useRef,
-    ...Lucide,
+    Lucide,
   };
+
+  // Same transform logic as DynamicComponent to ensure consistent preview behavior
+  const transformCode = (inputCode) => {
+     try {
+       if (inputCode.includes('=>') || inputCode.includes('function')) {
+         return `const App = ${inputCode}; render(<App />);`;
+       }
+       return `render(${inputCode});`;
+     } catch (e) {
+       return inputCode;
+     }
+   };
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-10">
@@ -44,7 +56,12 @@ export default function CodeEditModal({ isOpen, onClose, code, setCode, onSave, 
           </button>
         </div>
 
-        <LiveProvider code={code} scope={scope}>
+        <LiveProvider 
+            code={code} 
+            scope={scope} 
+            noInline={true} 
+            transformCode={transformCode}
+        >
           <div className="flex-grow grid grid-cols-2 gap-px bg-gray-700 overflow-hidden">
             <div className="flex flex-col h-full overflow-hidden bg-gray-900">
               <div className="flex-shrink-0 p-2 text-xs font-mono text-gray-400 border-b border-gray-700">Live Editor</div>
@@ -55,8 +72,10 @@ export default function CodeEditModal({ isOpen, onClose, code, setCode, onSave, 
 
             <div className="flex flex-col h-full overflow-hidden bg-white">
               <div className="flex-shrink-0 p-2 text-xs font-mono text-gray-500 bg-gray-100 border-b border-gray-300">Live Preview</div>
-              <div className="flex-grow overflow-auto">
-                <LivePreview className="h-full w-full" />
+              <div className="flex-grow relative">
+                 <div className="absolute inset-0 overflow-auto">
+                    <LivePreview style={{ minHeight: '100%', width: '100%' }} />
+                 </div>
               </div>
               <div className="flex-shrink-0 p-2 border-t border-gray-300 bg-gray-100 min-h-[50px]">
                 <LiveError className="text-xs text-red-600 bg-red-100 p-2 rounded" />
