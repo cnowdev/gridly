@@ -21,9 +21,6 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 /**
  * 1. The main grid component
- */
-/**
- * 1. The main grid component
  * -- THIS SECTION IS UPDATED --
  */
 function GridContainer({
@@ -65,6 +62,10 @@ function GridContainer({
       }}
       draggableCancel=".no-drag"
       compactType={null}
+
+      // --- THIS IS THE FIX ---
+      // This stops components from moving over or pushing other components
+      preventCollision={true}
     >
       {/* Render real components */}
       {components.map((comp) => (
@@ -75,7 +76,6 @@ function GridContainer({
             isDraggable: !comp.isLocked,
             isResizable: !comp.isLocked,
           }}
-          // --- FIX: Removed 'overflow-hidden' from this class list ---
           className={`relative group bg-gray-700 rounded-lg ring-1 ring-gray-600 shadow-lg
                       ${comp.isLocked ? 'ring-2 ring-blue-500' : ''}`}
         >
