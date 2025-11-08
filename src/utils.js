@@ -1,29 +1,84 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Added useEffect import
 import { GoogleGenAI } from '@google/genai';
 
 const API_KEY = import.meta.env.VITE_API_KEY;
 const genAI = new GoogleGenAI({ apiKey: API_KEY });
 
 export function useGridComponents() {
+  // ... (other state declarations remain the same)
   const [components, setComponents] = useState([]);
-  const [placeholderLayout, setPlaceholderLayout] = useState({ 
-    i: 'placeholder', 
-    x: 0, 
-    y: 0, 
-    w: 4, 
-    h: 2 
+  const [placeholderLayout, setPlaceholderLayout] = useState({
+    i: 'placeholder', x: 0, y: 0, w: 4, h: 2,
   });
   const [chatPrompt, setChatPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentEditingCode, setCurrentEditingCode] = useState('');
   const [currentEditingId, setCurrentEditingId] = useState(null);
+
+  const [settings, setSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gridly_settings');
+      if (!saved) {
+        const legacy = localStorage.getItem('gridly_design_system');
+        return {
+          colors: { background: '', secondary: '', text: '' }, // Highlight changed to text here too just in case
+          fonts: { primary: '', secondary: '' },
+          customRules: legacy || '',
+        };
+      }
+      return JSON.parse(saved);
+    } catch (error) {
+      console.warn('Failed to parse settings, resetting to defaults.', error);
+      return {
+        colors: { background: '', secondary: '', text: '' },
+        fonts: { primary: '', secondary: '' },
+        customRules: '',
+      };
+    }
+  });
+
+  // NEW: Onboarding Effect
+  useEffect(() => {
+    const hasVisited = localStorage.getItem('gridly_has_visited');
+    if (!hasVisited) {
+      setIsSettingsOpen(true);
+      localStorage.setItem('gridly_has_visited', 'true');
+    }
+  }, []);
+
+  // ...Tvst of the file remains exactly as you provided in your prompt
+  const handleSaveSettings = (newSettings) => {
+    setSettings(newSettings);
+    localStorage.setItem('gridly_settings', JSON.stringify(newSettings));
+    setIsSettingsOpen(false);
+  };
+
+  const getDesignSystemPrompt = () => {
+    const { colors, fonts, customRules } = settings;
+    const parts = [
+      colors.background && `- Preferred background color: ${colors.background}`,
+      colors.secondary && `- Secondary color: ${colors.secondary}`,
+      colors.text && `- Text color: ${colors.text}`, // Highlight changed to text
+      fonts.primary && `- Primary font family: ${fonts.primary}`,
+      fonts.secondary && `- Secondary font family: ${fonts.secondary}`,
+    ].filter(Boolean);
+
+    if (customRules && customRules.trim()) {
+      parts.push(customRules.trim());
+    }
+
+    return parts.length > 0 ? parts.join('\n') : '';
+  };
 
   const fetchGeminiCode = async (prompt) => {
     if (!API_KEY) {
       alert('Please add your Gemini API Key to .env');
       return '() => <div className="text-red-500 p-4">Error: Please set your API key in .env</div>';
     }
+
+    const designSystem = getDesignSystemPrompt();
 
     const systemPrompt = `
       You are an expert React and Tailwind CSS component generator.
@@ -38,14 +93,18 @@ export function useGridComponents() {
       - Assume 'lucide-react' icons are available in scope.
       - Respond ONLY with the raw component function:
         () => <div ... />  or  () => { const [s, setS] = useState(); return <div .../> }
+
+      ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ''}
+
+      If the user specifically asks for something different from the global design context, prioritize their request. If you feel like a color or font choice from the design system doesn't fit the component being generated, you can deviate from it as needed.
     `;
 
     const fullPrompt = `${systemPrompt}\n\nUser prompt: ${prompt}`;
 
     try {
-      const result = await genAI.models.generateContent({ 
-        model: 'gemini-2.5-flash', 
-        contents: fullPrompt 
+      const result = await genAI.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: fullPrompt,
       });
       let code = result.text;
 
@@ -69,10 +128,14 @@ export function useGridComponents() {
       layoutContext = `The component's container on the grid has a width of ${w} units and a height of ${h} units.`;
     }
 
+    const designSystem = getDesignSystemPrompt();
+
     const editPrompt = `
       You are an expert React and Tailwind CSS component editor.
       Return the entire new component function only. DO NOT include exports, imports, or code fences.
       Use Tailwind CSS for styling. Hooks and lucide icons are available in scope.
+
+      ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ''}
 
       Layout context: ${layoutContext}
 
@@ -83,9 +146,9 @@ export function useGridComponents() {
     `;
 
     try {
-      const result = await genAI.models.generateContent({ 
-        model: 'gemini-2.5-flash', 
-        prompt: editPrompt 
+      const result = await genAI.models.generateContent({
+        model: 'gemini-2.5-flash',
+        prompt: editPrompt,
       });
       let newCode = result.text;
 
@@ -147,11 +210,9 @@ export function useGridComponents() {
   };
 
   const handleModalSave = () => {
-    setComponents((prev) => 
-      prev.map((c) => 
-        c.id === currentEditingId 
-          ? { ...c, code: currentEditingCode } 
-          : c
+    setComponents((prev) =>
+      prev.map((c) =>
+        c.id === currentEditingId ? { ...c, code: currentEditingCode } : c
       )
     );
     handleModalClose();
@@ -162,31 +223,25 @@ export function useGridComponents() {
   };
 
   const handleToggleLock = (id) => {
-    setComponents((prev) => 
-      prev.map((c) => 
-        c.id === id 
-          ? { ...c, isLocked: !c.isLocked } 
-          : c
-      )
+    setComponents((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, isLocked: !c.isLocked } : c))
     );
   };
 
   return {
-    // State
     components,
     placeholderLayout,
     chatPrompt,
     isLoading,
     isModalOpen,
     currentEditingCode,
-    currentEditingId,
-    
-    // Setters
+    settings,
+    isSettingsOpen,
+    setIsSettingsOpen,
+    handleSaveSettings,
     setPlaceholderLayout,
     setChatPrompt,
     setCurrentEditingCode,
-    
-    // Handlers
     handlePromptSubmit,
     handleLayoutChange,
     handleComponentClick,
