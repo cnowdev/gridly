@@ -151,6 +151,7 @@ export default function App() {
                     {isPreviewMode ? (
                         <PreviewGrid components={components} />
                     ) : (
+                        <>
                         <GridContainer
                             components={components}
                             onLayoutChange={handleLayoutChange}
@@ -159,8 +160,24 @@ export default function App() {
                             onToggleLock={handleToggleLock}
                             placeholderLayout={placeholderLayout}
                             onPlaceholderLayoutChange={setPlaceholderLayout}
+                            showPlaceholder={showPlaceholder}
                         />
+
+                        {isDrawing && mainRef.current && (
+                            <div style={getDrawingRect(
+                                drawStart, 
+                                drawEnd, 
+                                mainRef.current?.scrollTop ?? 0, 
+                                mainRef.current?.scrollLeft ?? 0
+                            )} />
+                        )}
+                        </>
                     )}
+
+       
+
+
+
                 </main>
 
                 {!isPreviewMode && (
