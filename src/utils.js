@@ -240,8 +240,8 @@ export function useGridComponents() {
     const editPrompt = `
       You are an expert React and Tailwind CSS component editor.
       Return the entire new component function only. DO NOT include exports, imports, or code fences.
-      Use Tailwind CSS for styling. Hooks and lucide icons are available in scope. When using Lucide icons, use
-      Lucide.IconName (e.g., <Lucide.User />).
+      Use Tailwind CSS for styling. Hooks are available in scope. All Lucide icons are available under 
+      the 'Lucide' namespace (e.g., <Lucide.User />, <Lucide.Bell />, etc).
 
       ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ''}
 
