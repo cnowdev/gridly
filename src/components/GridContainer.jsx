@@ -14,6 +14,7 @@ export default function GridContainer({
   placeholderLayout,
   showPlaceholder,
   onCancelPlaceholder,
+  onDuplicateComponent,
 }) {
   const renderPlaceholder = (layout) => {
     // Hide text if width OR height is less than 3 units
@@ -124,6 +125,18 @@ export default function GridContainer({
                 title="Edit Component"
               >
                 <Lucide.Pencil size={16} />
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDuplicateComponent(comp.id);
+                }}
+                className="p-1.5 bg-gray-800/70 text-white rounded-md
+                           hover:bg-green-600 hover:text-white transition-colors"
+                title="Duplicate Component"
+              >
+                <Lucide.Copy size={16} />
               </button>
 
               <button

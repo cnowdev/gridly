@@ -67,8 +67,13 @@ export default function App() {
         handleGridMouseUp,
         togglePreview,
         handleCancelPlaceholder,
+        handleDuplicateComponent,
+        handleUndo,
+        handleRedo,
+        canUndo,
+        canRedo,
     } = useGridComponents();
-
+    
     const [isFirstTime, setIsFirstTime] = useState(false);
 
     useEffect(() => {
@@ -93,8 +98,8 @@ export default function App() {
         setIsSettingsOpen(false);
     };
     const mainRef = useRef(null);
-
-    // State to track the actual grid width for the modal
+    
+    // We need to capture the actual current gridWidth to pass it down
     const [currentGridWidth, setCurrentGridWidth] = useState(1200);
 
     useEffect(() => {
@@ -104,7 +109,7 @@ export default function App() {
             if (entries[0]) {
                 const width = entries[0].target.clientWidth;
                 setGridWidth(width);
-                setCurrentGridWidth(width);
+                setCurrentGridWidth(width); // Keep local state updated too
             }
         });
 
@@ -125,7 +130,7 @@ export default function App() {
                             linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
           background-size: 8.333333% 20px;
         }
-
+        /* ... other styles ... */
         .react-grid-item > .react-resizable-handle {
           z-index: 20;
         }
@@ -136,6 +141,7 @@ export default function App() {
       `}</style>
 
             <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
+                {/* ... Header ... */}
                 <header className="flex-shrink-0 p-4 bg-gray-800 border-b border-gray-700 shadow-md z-10 flex items-center justify-between">
                     <h1 className="text-xl font-bold flex items-center gap-2">
                         <Lucide.LayoutGrid className="text-blue-500" /> AI Grid Builder
@@ -183,6 +189,25 @@ export default function App() {
                         <Lucide.Settings size={16} />
                         Settings
                     </button>
+
+                    <div className="flex items-center gap-px rounded-lg overflow-hidden bg-gray-700 ring-1 ring-gray-600">
+                      <button
+                        onClick={handleUndo}
+                        disabled={!canUndo}
+                        className="p-2 text-white hover:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed"
+                        title="Undo (Ctrl+Z)"
+                      >
+                        <Lucide.Undo size={18} />
+                      </button>
+                      <button
+                        onClick={handleRedo}
+                        disabled={!canRedo}
+                        className="p-2 text-white hover:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed"
+                        title="Redo (Ctrl+Y)"
+                      >
+                        <Lucide.Redo size={18} />
+                      </button>
+                    </div>
                     </div>
                 </header>
 
@@ -195,7 +220,7 @@ export default function App() {
                     className="flex-grow overflow-auto relative"
                 >
                     {isPreviewMode ? (
-                        <PreviewGrid components={components} settings={settings} />
+                        <PreviewGrid components={components} />
                     ) : (
                         <>
                         <GridContainer
@@ -208,6 +233,7 @@ export default function App() {
                             onPlaceholderLayoutChange={setPlaceholderLayout}
                             showPlaceholder={showPlaceholder}
                             onCancelPlaceholder={handleCancelPlaceholder}
+                            onDuplicateComponent={handleDuplicateComponent}
                         />
 
                         {isDrawing && mainRef.current && (
@@ -234,7 +260,7 @@ export default function App() {
                     onSave={handleModalSave}
                     onEditCode={handleCodeEdit}
                     layout={currentEditingLayout}
-                    gridWidth={currentGridWidth} 
+                    gridWidth={currentGridWidth}
                 />
 
                 <SettingsModal

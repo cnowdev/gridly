@@ -91,7 +91,10 @@ export const downloadJSX = (jsxContent, filename = 'ExportedGrid.jsx') => {
 export function useGridComponents() {
   const savedState = loadState();
   
-  const [components, setComponents] = useState(savedState?.components || []);
+  const [history, setHistory] = useState([savedState?.components || []]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const components = history[historyIndex];
+
   const [placeholderLayout, setPlaceholderLayout] = useState(
     savedState?.placeholderLayout || { 
       i: 'placeholder', 
@@ -108,7 +111,6 @@ export function useGridComponents() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentEditingCode, setCurrentEditingCode] = useState('');
   const [currentEditingId, setCurrentEditingId] = useState(null);
-  // NEW: Track the layout of the component being edited
   const [currentEditingLayout, setCurrentEditingLayout] = useState(null); 
   const [isPreviewMode, setIsPreviewMode] = useState(false);
 
@@ -121,7 +123,31 @@ export function useGridComponents() {
   const [drawStart, setDrawStart] = useState(null);
   const [drawEnd, setDrawEnd] = useState(null);
   const [showPlaceholder, setShowPlaceholder] = useState(false);
+  const [ignoreNextLayoutChange, setIgnoreNextLayoutChange] = useState(false);
 
+  // This function wraps our state setting to manage the history array.
+  const setComponentsWithHistory = (newComponentsOrFn) => {
+    const currentComponents = history[historyIndex];
+
+    // Resolve the new state (whether it's a value or a function)
+    const newComponents = typeof newComponentsOrFn === 'function' 
+      ? newComponentsOrFn(currentComponents)
+      : newComponentsOrFn;
+
+    // Deep-compare the new state with the current state.
+    // If they are the same, don't create a new history entry.
+    if (JSON.stringify(newComponents) === JSON.stringify(currentComponents)) {
+      return;
+    }
+
+    // Cut off the 'future' history if we've undone
+    const currentHistory = history.slice(0, historyIndex + 1);
+    
+    const newHistory = [...currentHistory, newComponents];
+    
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
 
   const [settings, setSettings] = useState(() => {
     try {
@@ -227,13 +253,29 @@ export function useGridComponents() {
       alert('Gemini API Key is not set in .env file.');
       return currentCode;
     }
+
+    let currentComponentContext = ''; 
     const currentComponent = components.find((c) => c.id === currentEditingId);
-    let layoutContext = '';
 
     if (currentComponent) {
       const { w, h } = currentComponent.layout;
-      layoutContext = `The component's container on the grid has a width of ${w} units and a height of ${h} units.`;
+      currentComponentContext = `The component you are editing (ID: "${currentEditingId}") is in a container with grid width ${w} and grid height ${h}.`;
     }
+
+    const otherComponentsContext = components
+      .filter(c => c.id !== currentEditingId) // Get all *other* components
+      .map(c => `  - Component ID: "${c.id}" (Layout: x: ${c.layout.x}, y: ${c.layout.y}, w: ${c.layout.w}, h: ${c.layout.h})`)
+      .join('\n');
+    
+    // Combine all grid context into one block
+    const gridContext = `
+GRID CONTEXT:
+${currentComponentContext}
+${otherComponentsContext.length > 0 ? `
+Here are the other components on the grid (the user may refer to them by ID):
+${otherComponentsContext}
+` : ''}
+    `;
 
     const designSystem = getDesignSystemPrompt();
 
@@ -245,9 +287,11 @@ export function useGridComponents() {
 
       ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ''}
 
-      Layout context: ${layoutContext}
-      Current code:
+      ${gridContext} 
+
+      Current code (for component "${currentEditingId}"):
       ${currentCode}
+
       User request: ${userPrompt}
     `;
 
@@ -288,8 +332,10 @@ export function useGridComponents() {
         layout: { ...placeholderLayout, i: newId },
       };
 
-      setComponents((prev) => [...prev, newComponent]);
+      setComponentsWithHistory((prev) => [...prev, newComponent]);
       setShowPlaceholder(false);
+      // Ignore the next layout change from React Grid Layout's automatic positioning
+      setIgnoreNextLayoutChange(true);
     }
 
     setChatPrompt('');
@@ -302,12 +348,66 @@ export function useGridComponents() {
       setPlaceholderLayout(placeholder);
     }
     
-    setComponents((prevComps) =>
-      prevComps.map((comp) => {
+    // If we should ignore this layout change (e.g., right after adding a component)
+    if (ignoreNextLayoutChange) {
+      setIgnoreNextLayoutChange(false);
+      
+      // Still update the components array, but don't create history entry
+      const updatedComps = components.map((comp) => {
         const newLayout = newLayouts.find((l) => l.i === comp.id);
-        return newLayout ? { ...comp, layout: newLayout } : comp;
-      })
-    );
+        if (newLayout) {
+          return { 
+            ...comp, 
+            layout: {
+              i: newLayout.i,
+              x: newLayout.x,
+              y: newLayout.y,
+              w: newLayout.w,
+              h: newLayout.h,
+            }
+          };
+        }
+        return comp;
+      });
+      
+      // Update the state directly without going through history
+      setHistory(prev => {
+        const newHistory = [...prev];
+        newHistory[historyIndex] = updatedComps;
+        return newHistory;
+      });
+      return;
+    }
+    
+    // Check if anything actually changed before calling setComponentsWithHistory
+    let hasChanges = false;
+    
+    const updatedComps = components.map((comp) => {
+      const newLayout = newLayouts.find((l) => l.i === comp.id);
+
+      if (newLayout) {
+        // Normalize the layout object to only the properties we use.
+        const newNormalizedLayout = {
+          i: newLayout.i,
+          x: newLayout.x,
+          y: newLayout.y,
+          w: newLayout.w,
+          h: newLayout.h,
+        };
+
+        // Check if the layout actually changed
+        if (JSON.stringify(comp.layout) !== JSON.stringify(newNormalizedLayout)) {
+          hasChanges = true;
+          return { ...comp, layout: newNormalizedLayout };
+        }
+      }
+      return comp;
+    });
+
+    // Only update history if something actually changed
+    if (hasChanges) {
+      setComponentsWithHistory(updatedComps);
+    }
   };
 
   const handleGridMouseDown = (e) => {
@@ -378,7 +478,7 @@ export function useGridComponents() {
   };
 
   const handleModalSave = () => {
-    setComponents((prev) =>
+    setComponentsWithHistory((prev) =>
       prev.map((c) =>
         c.id === currentEditingId ? { ...c, code: currentEditingCode } : c
       )
@@ -387,11 +487,31 @@ export function useGridComponents() {
   };
 
   const handleDeleteComponent = (id) => {
-    setComponents((prev) => prev.filter((c) => c.id !== id));
+    setComponentsWithHistory((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const handleDuplicateComponent = (id) => {
+    const componentToDuplicate = components.find((c) => c.id === id);
+    if (!componentToDuplicate) return;
+
+    const newId = `comp-${Date.now()}`;
+    const newComponent = {
+      id: newId,
+      code: componentToDuplicate.code,
+      isLocked: false,
+      layout: {
+        ...componentToDuplicate.layout, // Copes w, h, etc.
+        i: newId, // Set new unique ID for the layout
+        // Place it just below the original. RGL will handle collisions.
+        y: componentToDuplicate.layout.y + componentToDuplicate.layout.h,
+      },
+    };
+
+    setComponentsWithHistory((prev) => [...prev, newComponent]);
   };
 
   const handleToggleLock = (id) => {
-    setComponents((prev) =>
+    setComponentsWithHistory((prev) =>
       prev.map((c) => (c.id === id ? { ...c, isLocked: !c.isLocked } : c))
     );
   };
@@ -404,8 +524,16 @@ export function useGridComponents() {
   }
 
   const clearAllComponents = () => {
-    setComponents([]);
+    setComponentsWithHistory([]);
     setPlaceholderLayout({ i: 'placeholder', x: 0, y: 0, w: 4, h: 2 });
+  };
+
+  const handleUndo = () => {
+    setHistoryIndex(prevIndex => Math.max(0, prevIndex - 1));
+  };
+
+  const handleRedo = () => {
+    setHistoryIndex(prevIndex => Math.min(history.length - 1, prevIndex + 1));
   };
 
   const handleExport = () => {
@@ -449,6 +577,7 @@ export function useGridComponents() {
     handleModalClose,
     handleModalSave,
     handleDeleteComponent,
+    handleDuplicateComponent,
     handleToggleLock,
     handleCodeEdit,
     clearAllComponents,
@@ -458,5 +587,9 @@ export function useGridComponents() {
     handleGridMouseUp,
     handleCancelPlaceholder,
     togglePreview,
+    handleUndo,
+    handleRedo,
+    canUndo: historyIndex > 0,
+    canRedo: historyIndex < history.length - 1,
   };
 }
