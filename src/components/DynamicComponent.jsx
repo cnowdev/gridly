@@ -8,7 +8,7 @@ const scope = {
   useEffect: React.useEffect,
   useCallback: React.useCallback,
   useRef: React.useRef,
-  Lucide,
+  Lucide: Lucide,
 };
 
 export default function DynamicComponent({ code }) {
