@@ -1,23 +1,63 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 
 const API_KEY = import.meta.env.VITE_API_KEY;
 const genAI = new GoogleGenAI({ apiKey: API_KEY });
 
+// LocalStorage key
+const STORAGE_KEY = 'gridly-state';
+
+// Load state from localStorage
+const loadState = () => {
+  try {
+    const savedState = localStorage.getItem(STORAGE_KEY);
+    if (savedState) {
+      return JSON.parse(savedState);
+    }
+  } catch (error) {
+    console.error('Failed to load state from localStorage:', error);
+  }
+  return null;
+};
+
+// Save state to localStorage
+const saveState = (components, placeholderLayout) => {
+  try {
+    const state = {
+      components,
+      placeholderLayout,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    console.error('Failed to save state to localStorage:', error);
+  }
+};
+
 export function useGridComponents() {
-  const [components, setComponents] = useState([]);
-  const [placeholderLayout, setPlaceholderLayout] = useState({ 
-    i: 'placeholder', 
-    x: 0, 
-    y: 0, 
-    w: 4, 
-    h: 2 
-  });
+  // Initialize state from localStorage or use defaults
+  const savedState = loadState();
+  
+  const [components, setComponents] = useState(savedState?.components || []);
+  const [placeholderLayout, setPlaceholderLayout] = useState(
+    savedState?.placeholderLayout || { 
+      i: 'placeholder', 
+      x: 0, 
+      y: 0, 
+      w: 4, 
+      h: 2 
+    }
+  );
   const [chatPrompt, setChatPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentEditingCode, setCurrentEditingCode] = useState('');
   const [currentEditingId, setCurrentEditingId] = useState(null);
+
+  // Persist state whenever components or placeholderLayout changes
+  useEffect(() => {
+    saveState(components, placeholderLayout);
+  }, [components, placeholderLayout]);
 
   const fetchGeminiCode = async (prompt) => {
     if (!API_KEY) {
@@ -171,6 +211,11 @@ export function useGridComponents() {
     setIsModalOpen(true);
   }
 
+  const clearAllComponents = () => {
+    setComponents([]);
+    setPlaceholderLayout({ i: 'placeholder', x: 0, y: 0, w: 4, h: 2 });
+  };
+
   return {
     // State
     components,
@@ -195,5 +240,6 @@ export function useGridComponents() {
     handleDeleteComponent,
     handleToggleLock,
     handleCodeEdit,
+    clearAllComponents,
   };
 }
