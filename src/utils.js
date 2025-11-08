@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const API_KEY = import.meta.env.VITE_API_KEY;
-const genAI = new GoogleGenAI({ apiKey: API_KEY });
+
+let genAI;
+let model;
+if (API_KEY) {
+  genAI = new GoogleGenerativeAI(API_KEY);
+  model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
+} 
+
+if (!API_KEY) {
+  console.error("VITE_API_KEY is not set. Please add it to your .env file.");
+}
 
 // LocalStorage key
 const STORAGE_KEY = 'gridly-state';
@@ -79,7 +89,6 @@ export const downloadJSX = (jsxContent, filename = 'ExportedGrid.jsx') => {
 };
 
 export function useGridComponents() {
-  // ...existing code...
   const savedState = loadState();
   
   const [components, setComponents] = useState(savedState?.components || []);
@@ -94,20 +103,25 @@ export function useGridComponents() {
   );
   const [chatPrompt, setChatPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentEditingCode, setCurrentEditingCode] = useState('');
   const [currentEditingId, setCurrentEditingId] = useState(null);
-
-  // ...existing code...
 
   useEffect(() => {
     saveState(components, placeholderLayout);
   }, [components, placeholderLayout]);
 
+  const [gridWidth, setGridWidth] = useState(1200);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawStart, setDrawStart] = useState(null);
+  const [drawEnd, setDrawEnd] = useState(null);
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
+
+
   const fetchGeminiCode = async (prompt) => {
-    // ...existing code...
-    if (!API_KEY) {
-      alert('Please add your Gemini API Key to .env');
+    if (!model) {
+      alert('Gemini API Key is not set in .env file.');
       return '() => <div className="text-red-500 p-4">Error: Please set your API key in .env</div>';
     }
 
@@ -130,11 +144,9 @@ export function useGridComponents() {
     const fullPrompt = `${systemPrompt}\n\nUser prompt: ${prompt}`;
 
     try {
-      const result = await genAI.models.generateContent({ 
-        model: 'gemini-2.5-flash', 
-        contents: fullPrompt 
-      });
-      let code = result.text;
+      const result = await model.generateContent(fullPrompt);
+      const response = await result.response;
+      let code = response.text();
 
       const match = code.match(/```(?:jsx|javascript|js)?\n([\s\S]*?)\n```/);
       if (match) code = match[1];
@@ -148,7 +160,10 @@ export function useGridComponents() {
   };
 
   const handleCodeEdit = async (currentCode, userPrompt) => {
-    // ...existing code...
+    if (!model) {
+      alert('Gemini API Key is not set in .env file.');
+      return currentCode;
+    }
     const currentComponent = components.find((c) => c.id === currentEditingId);
     let layoutContext = '';
 
@@ -164,19 +179,15 @@ export function useGridComponents() {
       Lucide.IconName (e.g., <Lucide.User />).
 
       Layout context: ${layoutContext}
-
       Current code:
       ${currentCode}
-
       User request: ${userPrompt}
     `;
 
     try {
-      const result = await genAI.models.generateContent({ 
-        model: 'gemini-2.5-flash', 
-        contents: editPrompt 
-      });
-      let newCode = result.text;
+      const result = await model.generateContent(editPrompt);
+      const response = await result.response;
+      let newCode = response.text();
 
       const match = newCode.match(/```(?:jsx|javascript|js)?\n([\s\S]*?)\n```/);
       if (match) newCode = match[1];
@@ -194,8 +205,12 @@ export function useGridComponents() {
     e.preventDefault();
     if (!chatPrompt || isLoading) return;
 
-    setIsLoading(true);
+    if (!showPlaceholder) {
+      alert("Please draw a box on the grid first to set the component's position and size.");
+      return;
+    }
 
+    setIsLoading(true);
     const generatedCode = await fetchGeminiCode(chatPrompt);
 
     if (generatedCode) {
@@ -208,7 +223,7 @@ export function useGridComponents() {
       };
 
       setComponents((prev) => [...prev, newComponent]);
-      setPlaceholderLayout({ i: 'placeholder', x: 0, y: 0, w: 4, h: 2 });
+      setShowPlaceholder(false);
     }
 
     setChatPrompt('');
@@ -216,13 +231,83 @@ export function useGridComponents() {
   };
 
   const handleLayoutChange = (newLayouts) => {
-    // ...existing code...
+    const placeholder = newLayouts.find((l) => l.i === 'placeholder');
+    if (placeholder) {
+      setPlaceholderLayout(placeholder);
+    }
+    
     setComponents((prevComps) =>
       prevComps.map((comp) => {
         const newLayout = newLayouts.find((l) => l.i === comp.id);
         return newLayout ? { ...comp, layout: newLayout } : comp;
       })
     );
+  };
+
+  const handleGridMouseDown = (e) => {
+    // Only start drawing if the click is on the grid background itself
+    if (e.target.classList.contains('react-grid-layout') || e.target.classList.contains('layout')) {
+      setIsDrawing(true);
+      setShowPlaceholder(false);
+      const rect = e.currentTarget.getBoundingClientRect();
+      
+      // Add scroll offsets for correct coordinates
+      const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
+      const y = e.clientY - rect.top + e.currentTarget.scrollTop; 
+      
+      setDrawStart({ x, y });
+      setDrawEnd({ x, y });
+    }
+  };
+
+  const handleGridMouseMove = (e) => {
+    if (!isDrawing) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    
+    // Add scroll offsets for correct coordinates
+    const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
+    const y = e.clientY - rect.top + e.currentTarget.scrollTop;
+
+    setDrawEnd({ x, y });
+  };
+
+  const handleGridMouseUp = (e) => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+
+    const rowHeight = 20; // Must match rowHeight in GridContainer
+    const cols = 12;
+    const colWidth = gridWidth / cols;
+
+    const startX = Math.min(drawStart.x, drawEnd.x);
+    const startY = Math.min(drawStart.y, drawEnd.y);
+    const endX = Math.max(drawStart.x, drawEnd.x);
+    const endY = Math.max(drawStart.y, drawEnd.y);
+
+    const newLayout = {
+      i: 'placeholder',
+      x: Math.floor(startX / colWidth),
+      y: Math.floor(startY / rowHeight),
+      w: Math.max(1, Math.round((endX - startX) / colWidth)),
+      h: Math.max(1, Math.round((endY - startY) / rowHeight)),
+    };
+
+    if (newLayout.w < 1 && newLayout.h < 1) {
+      setDrawStart(null);
+      setDrawEnd(null);
+      return;
+    }
+
+    setPlaceholderLayout(newLayout);
+    setShowPlaceholder(true);
+    setDrawStart(null);
+    setDrawEnd(null);
+  };
+
+  const handleComponentClick = (component) => {
+    setCurrentEditingId(component.id);
+    setCurrentEditingCode(component.code);
+    setIsModalOpen(true);
   };
 
   const handleModalClose = () => {
@@ -291,11 +376,16 @@ export function useGridComponents() {
     isModalOpen,
     currentEditingCode,
     currentEditingId,
+    isDrawing,
+    drawStart,
+    drawEnd,
+    showPlaceholder,
     
     // Setters
     setPlaceholderLayout,
     setChatPrompt,
     setCurrentEditingCode,
+    setGridWidth,
     
     // Handlers
     handlePromptSubmit,
@@ -308,5 +398,8 @@ export function useGridComponents() {
     handleCodeEdit,
     clearAllComponents,
     handleExport,
+    handleGridMouseDown,
+    handleGridMouseMove,
+    handleGridMouseUp,
   };
 }

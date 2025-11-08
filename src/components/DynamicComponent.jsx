@@ -11,10 +11,10 @@ const scope = {
   Lucide: Lucide,
 };
 
-export default function DynamicComponent({ code, onClick }) {
+export default function DynamicComponent({ code }) {
   return (
     <LiveProvider code={code} scope={scope}>
-      <div onClick={onClick} className="h-full w-full">
+      <div className="h-full w-full">
         <div className="h-full w-full overflow-auto live-preview-wrapper">
           <LivePreview className="h-full w-full" />
         </div>
