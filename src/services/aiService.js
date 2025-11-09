@@ -122,6 +122,7 @@ const fetchGeminiCode = async (
     - Use Tailwind utilities for hierarchy, spacing, and layout.
     - Hooks ('useState', 'useEffect', 'useRef') are available.
     - Lucide icons are available as 'Lucide.IconName' (e.g., <Lucide.User />).
+    - You also have access to async function generateText(prompt) for generating text content. Use this if you need to generate dynamic text content, like implementing a chatbot.
 
     Before returning:
     - VERIFY that all navigation or core elements are visible.
