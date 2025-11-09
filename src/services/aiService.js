@@ -97,10 +97,14 @@ const fetchGeminiCode = async (
     - Otherwise, DO NOT include or reference any text within or around the image.
     - DO NOT add padding, simply the image to fill the space as appropriate.
     - If centering causes empty space or awkward composition (e.g., subject cut off or head cropped),
-    then crop the image intelligently using \`object-cover\` to preserve a balanced frame.
+    then crop the image intelligently ONLY using \`object-contain\` to preserve a balanced frame.
     - Never distort the image — maintain the correct aspect ratio at all times.
     - The container should control overall sizing and shape, not the image’s intrinsic dimensions.
     - Use a flexible layout that adapts to different screen sizes while preserving composition.
+    - DO NOT use a mx-width or max-height or fixed width/height that would cut off part of the image (only w-full, h-full)
+    - Use object-contain to control aspect ratio
+    - Use w-full to control width
+    - Use h-full to ensure it fills the container height
 
     ==========================
     REACT COMPONENT MODE
@@ -182,14 +186,15 @@ const fetchGeminiCode = async (
         - DO NOT add buttons, labels, or other UI elements unless explicitly requested.
         - DO NOT add padding, simply the image to fill the space as appropriate.
         - If centering causes empty space or awkward composition (e.g., subject cut off or head cropped),
-        then crop the image intelligently using \`object-cover\` to preserve a balanced frame.
+        then crop the image intelligently ONLY using \`object-contain\` to preserve a balanced frame.
         - Never distort the image — maintain the correct aspect ratio at all times.
         - The container should control overall sizing and shape, not the image’s intrinsic dimensions.
         - Use a flexible layout that adapts to different screen sizes while preserving composition.
+        - DO NOT use a mx-width or max-height or fixed width/height that would cut off part of the image (only w-full, h-full)
         IMPORTANT: Size the image appropriately using Tailwind classes:
-        - Use object-cover or object-contain to control aspect ratio
-        - Use w-full or max-w-* to control width
-        - Use h-48, h-64, h-96, or max-h-* to limit height (don't make it too tall)
+        - Use object-contain to control aspect ratio
+        - Use w-full to control width
+        - Use h-full to ensure it fills the container height
         - Consider using rounded corners (rounded-lg, rounded-xl) for aesthetics
         
         Style the image appropriately with Tailwind CSS to fit the overall component design.
@@ -307,10 +312,14 @@ ${otherComponentsContext}
     - DO NOT add buttons, labels, or other UI elements unless explicitly requested.
     - DO NOT add padding, simply the image to fill the space as appropriate.
     - If centering causes empty space or awkward composition (e.g., subject cut off or head cropped),
-    then crop the image intelligently using \`object-cover\` to preserve a balanced frame.
+    then crop the image intelligently ONLY using \`object-contain\` to preserve a balanced frame.
     - Never distort the image — maintain the correct aspect ratio at all times.
     - The container should control overall sizing and shape, not the image’s intrinsic dimensions.
     - Use a flexible layout that adapts to different screen sizes while preserving composition.
+    - DO NOT use a mx-width or max-height or fixed width/height that would cut off part of the image (only w-full, h-full)
+    - Use object-contain to control aspect ratio
+    - Use w-full to control width
+    - Use h-full to ensure it fills the container height
     
     OTHERWISE:
     You are an expert React and Tailwind CSS component editor.
@@ -369,14 +378,15 @@ ${otherComponentsContext}
         - DO NOT add buttons, labels, or other UI elements unless explicitly requested.
         - DO NOT add padding, simply the image to fill the space as appropriate.
         - If centering causes empty space or awkward composition (e.g., subject cut off or head cropped),
-        then crop the image intelligently using \`object-cover\` to preserve a balanced frame.
+        then crop the image intelligently ONLY using \`object-contain\` to preserve a balanced frame.
         - Never distort the image — maintain the correct aspect ratio at all times.
         - The container should control overall sizing and shape, not the image’s intrinsic dimensions.
         - Use a flexible layout that adapts to different screen sizes while preserving composition.
+        - DO NOT use a mx-width or max-height or fixed width/height that would cut off part of the image (only w-full, h-full)
         IMPORTANT: Size the image appropriately using Tailwind classes:
-        - Use object-cover or object-contain to control aspect ratio
-        - Use w-full or max-w-* to control width
-        - Use h-48, h-64, h-96, or max-h-* to limit height (don't make it too tall)
+        - Use object-contain to control aspect ratio
+        - Use w-full to control width
+        - Use h-full to ensure it fills the container height
         - Consider using rounded corners (rounded-lg, rounded-xl) for aesthetics
         
         Style the image appropriately with Tailwind CSS to fit the component's design.
