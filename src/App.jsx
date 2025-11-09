@@ -6,29 +6,31 @@ import ChatBar from './components/ChatBar';
 import CodeEditModal from './components/CodeEditModal';
 import SettingsModal from './components/SettingsModal';
 import ApiView from './components/ApiView';
+import ApiEndpointEditModal from './components/ApiEndpointEditModal'; // 👈 NEW IMPORT
 import { useGridComponents } from './hooks/useGridComponents'
+import { useApiBuilder } from './hooks/useApiBuilder';
 import { DEFAULT_SETTINGS } from './settings';
 import PreviewGrid from './components/PreviewGrid';
 
 function getDrawingRect(start, end, scrollTop = 0, scrollLeft = 0) {
-  if (!start || !end) return { display: 'none' };
+    if (!start || !end) return { display: 'none' };
+    
+    const left = Math.min(start.x, end.x) - scrollLeft;
+    const top = Math.min(start.y, end.y) - scrollTop;
+    const width = Math.abs(start.x - end.x);
+    const height = Math.abs(start.y - end.y);
 
-  const left = Math.min(start.x, end.x) - scrollLeft;
-  const top = Math.min(start.y, end.y) - scrollTop;
-  const width = Math.abs(start.x - end.x);
-  const height = Math.abs(start.y - end.y);
-
-  return {
-    position: 'absolute',
-    left: `${left}px`,
-    top: `${top}px`,
-    width: `${width}px`,
-    height: `${height}px`,
-    backgroundColor: 'rgba(71, 85, 105, 0.5)',
-    border: '2px dashed #94a3b8',
-    borderRadius: '0.5rem',
-    zIndex: 40,
-  };
+    return {
+        position: 'absolute',
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${width}px`,
+        height: `${height}px`,
+        backgroundColor: 'rgba(71, 85, 105, 0.5)', 
+        border: '2px dashed #94a3b8', 
+        borderRadius: '0.5rem',
+        zIndex: 40,
+    };
 }
 
 export default function App() {
@@ -74,59 +76,104 @@ export default function App() {
     canUndo,
     canRedo,
   } = useGridComponents();
+  // --- Frontend State ---
+  const grid = useGridComponents();
+  
+  // --- Backend State ---
+  const apiBuilder = useApiBuilder();
 
   const [isFirstTime, setIsFirstTime] = useState(false);
-  const [activeMode, setActiveMode] = useState('frontend');
+  const [activeMode, setActiveMode] = useState('frontend'); // 'frontend' | 'backend'
   const [isApiViewOpen, setIsApiViewOpen] = useState(false);
 
   useEffect(() => {
     const hasSeenWelcome = localStorage.getItem('hasSeenSettingsWelcome');
     if (!hasSeenWelcome) {
       setIsFirstTime(true);
-      setIsSettingsOpen(true);
+      grid.setIsSettingsOpen(true);
     }
 
-    if (!settings) {
-      handleSaveSettings(DEFAULT_SETTINGS);
+    if (!grid.settings) {
+      grid.handleSaveSettings(DEFAULT_SETTINGS);
     }
-  }, [setIsSettingsOpen, settings, handleSaveSettings]);
+  }, [grid.setIsSettingsOpen, grid.settings, grid.handleSaveSettings]);
 
   const handleSaveSettingsWrapper = (newSettings) => {
-    handleSaveSettings(newSettings);
+    grid.handleSaveSettings(newSettings);
     if (isFirstTime) {
       localStorage.setItem('hasSeenSettingsWelcome', 'true');
       setIsFirstTime(false);
     }
-    setIsSettingsOpen(false);
+    grid.setIsSettingsOpen(false);
   };
 
   const mainRef = useRef(null);
+  // State to track the actual grid width for the modal
   const [currentGridWidth, setCurrentGridWidth] = useState(1200);
 
   useEffect(() => {
     if (!mainRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      if (entries[0]) {
-        const width = entries[0].target.clientWidth;
-        setGridWidth(width);
-        setCurrentGridWidth(width);
-      }
+    // Only observe resize if we are in frontend mode to avoid errors if mainRef changes
+    if (activeMode !== 'frontend') return;
+
+    const observer = new ResizeObserver(entries => {
+        if (entries[0]) {
+            const width = entries[0].target.clientWidth;
+            grid.setGridWidth(width);
+            setCurrentGridWidth(width);
+        }
     });
+
     observer.observe(mainRef.current);
-    const initialWidth = mainRef.current.clientWidth;
-    setGridWidth(initialWidth);
-    setCurrentGridWidth(initialWidth);
+    // Initial set
+    if (mainRef.current) {
+       const initialWidth = mainRef.current.clientWidth;
+       grid.setGridWidth(initialWidth);
+       setCurrentGridWidth(initialWidth);
+    }
+
     return () => observer.disconnect();
-  }, [setGridWidth]);
+  }, [grid.setGridWidth, activeMode]); // Re-run when mode changes
+
+  // --- Unified Submit Handler ---
+  const handleUnifiedSubmit = (e) => {
+      if (activeMode === 'frontend') {
+          grid.handlePromptSubmit(e);
+      } else {
+          e.preventDefault();
+          if (!grid.chatPrompt.trim()) return;
+          apiBuilder.generateEndpoint(grid.chatPrompt);
+          grid.setChatPrompt('');
+      }
+  };
+
+  // --- Unified Export Handler ---
+  const handleUnifiedExport = () => {
+      if (activeMode === 'frontend') {
+          grid.handleExport();
+      } else {
+          apiBuilder.exportApiCode();
+      }
+  };
+
+  const isAnyLoading = grid.isLoading || apiBuilder.isApiLoading;
 
   return (
     <>
-      <style>{`
+       <style>{`
         .layout {
-          background-color: #111827;
+          background-color: #111827; /* gray-900 */
           background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
                             linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
           background-size: 8.333333% 20px;
+        }
+
+        .react-grid-item > .react-resizable-handle {
+          z-index: 20;
+        }
+
+        .react-draggable-dragging .live-preview-wrapper {
+          pointer-events: none;
         }
       `}</style>
 
@@ -148,74 +195,91 @@ export default function App() {
             setIsApiViewOpen={setIsApiViewOpen}
         />
 
-        {/* ===== Main Grid ===== */}
+        {/* ===== Main Content Area ===== */}
         <main
           ref={mainRef}
-          onMouseDown={handleGridMouseDown}
-          onMouseMove={handleGridMouseMove}
-          onMouseUp={handleGridMouseUp}
-          onMouseLeave={handleGridMouseUp}
+          // Only attach grid handlers in frontend mode
+          onMouseDown={activeMode === 'frontend' ? grid.handleGridMouseDown : undefined}
+          onMouseMove={activeMode === 'frontend' ? grid.handleGridMouseMove : undefined}
+          onMouseUp={activeMode === 'frontend' ? grid.handleGridMouseUp : undefined}
+          onMouseLeave={activeMode === 'frontend' ? grid.handleGridMouseUp : undefined}
           className="flex-grow overflow-auto relative"
         >
-          {isPreviewMode ? (
-            <PreviewGrid components={components} />
-          ) : (
-            <>
-              <GridContainer
-                components={components}
-                onLayoutChange={handleLayoutChange}
-                onDeleteComponent={handleDeleteComponent}
-                openEditModal={openEditModal}
-                onToggleLock={handleToggleLock}
-                placeholderLayout={placeholderLayout}
-                onPlaceholderLayoutChange={setPlaceholderLayout}
-                showPlaceholder={showPlaceholder}
-                onCancelPlaceholder={handleCancelPlaceholder}
-                onDuplicateComponent={handleDuplicateComponent}
-              />
-              {isDrawing && mainRef.current && (
-                <div
-                  style={getDrawingRect(
-                    drawStart,
-                    drawEnd,
-                    mainRef.current?.scrollTop ?? 0,
-                    mainRef.current?.scrollLeft ?? 0
+          {activeMode === 'frontend' ? (
+             grid.isPreviewMode ? (
+                <PreviewGrid components={grid.components} settings={grid.settings} />
+             ) : (
+                <>
+                  <GridContainer
+                    components={grid.components}
+                    onLayoutChange={grid.handleLayoutChange}
+                    onDeleteComponent={grid.handleDeleteComponent}
+                    openEditModal={grid.openEditModal}
+                    onToggleLock={grid.handleToggleLock}
+                    placeholderLayout={grid.placeholderLayout}
+                    onPlaceholderLayoutChange={grid.setPlaceholderLayout}
+                    showPlaceholder={grid.showPlaceholder}
+                    onCancelPlaceholder={grid.handleCancelPlaceholder}
+                    onDuplicateComponent={grid.handleDuplicateComponent}
+                  />
+                  {grid.isDrawing && mainRef.current && (
+                    <div
+                      style={getDrawingRect(
+                        grid.drawStart,
+                        grid.drawEnd,
+                        mainRef.current?.scrollTop ?? 0,
+                        mainRef.current?.scrollLeft ?? 0
+                      )}
+                    />
                   )}
-                />
-              )}
-            </>
+                </>
+             )
+          ) : (
+             /* Backend Mode View */
+             <ApiView apiState={apiBuilder} />
           )}
         </main>
 
-        {!isPreviewMode && (
+        {/* Chat Bar - Hidden in Preview Mode, visible in both Edit Frontend & Backend */}
+        {!(activeMode === 'frontend' && grid.isPreviewMode) && (
           <ChatBar
-            prompt={chatPrompt}
-            setPrompt={setChatPrompt}
-            onSubmit={handlePromptSubmit}
-            isLoading={isLoading}
+            prompt={grid.chatPrompt}
+            setPrompt={grid.setChatPrompt}
+            onSubmit={handleUnifiedSubmit}
+            isLoading={isAnyLoading}
           />
         )}
 
+        {/* Modals */}
         <CodeEditModal
-          isOpen={isModalOpen}
-          onClose={handleModalClose}
-          code={currentEditingCode}
-          setCode={setCurrentEditingCode}
-          onSave={handleModalSave}
-          onEditCode={handleCodeEdit}
-          layout={currentEditingLayout}
+          isOpen={grid.isModalOpen}
+          onClose={grid.handleModalClose}
+          code={grid.currentEditingCode}
+          setCode={grid.setCurrentEditingCode}
+          onSave={grid.handleModalSave}
+          onEditCode={grid.handleCodeEdit}
+          layout={grid.currentEditingLayout}
           gridWidth={currentGridWidth}
         />
 
+        {/* NEW MODAL FOR API EDITING */}
+        <ApiEndpointEditModal 
+            isOpen={apiBuilder.isEditModalOpen}
+            onClose={apiBuilder.closeEditModal}
+            code={apiBuilder.currentEditingCode}
+            setCode={apiBuilder.setCurrentEditingCode}
+            onSave={apiBuilder.saveAndValidateEndpoint}
+            onChatEdit={apiBuilder.editEndpointAi}
+            isAiLoading={apiBuilder.isApiLoading}
+        />
+
         <SettingsModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          settings={settings || DEFAULT_SETTINGS}
+          isOpen={grid.isSettingsOpen}
+          onClose={() => grid.setIsSettingsOpen(false)}
+          settings={grid.settings || DEFAULT_SETTINGS}
           onSave={handleSaveSettingsWrapper}
           isFirstTime={isFirstTime}
         />
-
-        <ApiView isOpen={isApiViewOpen} onClose={() => setIsApiViewOpen(false)} />
       </div>
     </>
   );

@@ -37,21 +37,24 @@
 }
 .react-grid-item > .react-resizable-handle {
   position: absolute;
-  width: 20px;
-  height: 20px;
-  bottom: 0;
-  right: 0;
+  /* Reduced size to fit in standard 20px rows */
+  width: 16px;
+  height: 16px;
+  /* Moved closer to corner to avoid clipping in small items */
+  bottom: 2px;
+  right: 2px;
   cursor: se-resize;
-  /* CRITICAL FIX: High z-index to ensure it appears above generated content */
-  z-index: 9999;
+  /* CRITICAL FIX: massively increased z-index to beat any component internal z-index */
+  z-index: 100000 !important;
 }
 .react-grid-item > .react-resizable-handle::after {
   content: "";
   position: absolute;
   right: 3px;
   bottom: 3px;
-  width: 5px;
-  height: 5px;
-  border-right: 2px solid rgba(255, 255, 255, 0.4);
-  border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid rgba(255, 255, 255, 0.7);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.7);
+  border-bottom-right-radius: 1px;
 }
