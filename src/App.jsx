@@ -220,7 +220,7 @@ export default function App() {
                     className="flex-grow overflow-auto relative"
                 >
                     {isPreviewMode ? (
-                        <PreviewGrid components={components} />
+                        <PreviewGrid components={components} settings={settings} />
                     ) : (
                         <>
                         <GridContainer
