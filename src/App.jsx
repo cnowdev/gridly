@@ -7,7 +7,7 @@ import ChatBar from './components/ChatBar';
 import CodeEditModal from './components/CodeEditModal';
 import SettingsModal from './components/SettingsModal';
 import ApiView from './components/ApiView';
-import { useGridComponents } from './utils';
+import { useGridComponents } from './hooks/useGridComponents'
 import { DEFAULT_SETTINGS } from './settings';
 import PreviewGrid from './components/PreviewGrid';
 
