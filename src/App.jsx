@@ -6,7 +6,8 @@ import ChatBar from './components/ChatBar';
 import CodeEditModal from './components/CodeEditModal';
 import SettingsModal from './components/SettingsModal';
 import ApiView from './components/ApiView';
-import ApiEndpointEditModal from './components/ApiEndpointEditModal'; // 👈 NEW IMPORT
+import ApiEndpointEditModal from './components/ApiEndpointEditModal';
+import BaseServerEditModal from './components/BaseServerEditModal'; // 👈 Make sure this is imported
 import { useGridComponents } from './hooks/useGridComponents'
 import { useApiBuilder } from './hooks/useApiBuilder';
 import { DEFAULT_SETTINGS } from './settings';
@@ -34,48 +35,6 @@ function getDrawingRect(start, end, scrollTop = 0, scrollLeft = 0) {
 }
 
 export default function App() {
-  const {
-    components,
-    placeholderLayout,
-    chatPrompt,
-    isLoading,
-    isModalOpen,
-    currentEditingCode,
-    currentEditingLayout,
-    settings,
-    isSettingsOpen,
-    setIsSettingsOpen,
-    handleSaveSettings,
-    isDrawing,
-    drawStart,
-    drawEnd,
-    showPlaceholder,
-    isPreviewMode,
-    setPlaceholderLayout,
-    setChatPrompt,
-    setCurrentEditingCode,
-    setGridWidth,
-    handlePromptSubmit,
-    handleLayoutChange,
-    openEditModal,
-    handleModalClose,
-    handleModalSave,
-    handleDeleteComponent,
-    handleToggleLock,
-    handleCodeEdit,
-    clearAllComponents,
-    handleExport,
-    handleGridMouseDown,
-    handleGridMouseMove,
-    handleGridMouseUp,
-    togglePreview,
-    handleCancelPlaceholder,
-    handleDuplicateComponent,
-    handleUndo,
-    handleRedo,
-    canUndo,
-    canRedo,
-  } = useGridComponents();
   // --- Frontend State ---
   const grid = useGridComponents();
   
@@ -182,16 +141,16 @@ export default function App() {
         <Header 
             activeMode={activeMode}
             setActiveMode={setActiveMode}
-            togglePreview={togglePreview}
-            isPreviewMode={isPreviewMode}
-            components={components}
-            clearAllComponents={clearAllComponents}
-            handleExport={handleExport}
-            handleUndo={handleUndo}
-            canUndo={canUndo}
-            handleRedo={handleRedo}
-            canRedo={canRedo}
-            setIsSettingsOpen={setIsSettingsOpen}
+            togglePreview={grid.togglePreview}
+            isPreviewMode={grid.isPreviewMode}
+            components={grid.components}
+            clearAllComponents={grid.clearAllComponents}
+            handleExport={handleUnifiedExport}
+            handleUndo={grid.handleUndo}
+            canUndo={grid.canUndo}
+            handleRedo={grid.handleRedo}
+            canRedo={grid.canRedo}
+            setIsSettingsOpen={grid.setIsSettingsOpen}
             setIsApiViewOpen={setIsApiViewOpen}
         />
 
@@ -262,7 +221,7 @@ export default function App() {
           gridWidth={currentGridWidth}
         />
 
-        {/* NEW MODAL FOR API EDITING */}
+        {/* API ENDPOINT EDIT MODAL */}
         <ApiEndpointEditModal 
             isOpen={apiBuilder.isEditModalOpen}
             onClose={apiBuilder.closeEditModal}
@@ -271,6 +230,15 @@ export default function App() {
             onSave={apiBuilder.saveAndValidateEndpoint}
             onChatEdit={apiBuilder.editEndpointAi}
             isAiLoading={apiBuilder.isApiLoading}
+        />
+
+        {/* --- FIX: ADDED MISSING BASE SERVER MODAL --- */}
+        <BaseServerEditModal 
+            isOpen={apiBuilder.isBaseEditModalOpen}
+            onClose={apiBuilder.closeBaseEditModal}
+            code={apiBuilder.currentEditingBaseCode}
+            setCode={apiBuilder.setCurrentEditingBaseCode}
+            onSave={apiBuilder.saveBaseEditModal}
         />
 
         <SettingsModal
