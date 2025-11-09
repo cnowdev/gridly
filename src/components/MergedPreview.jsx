@@ -60,10 +60,9 @@ export default function MergedPreview({ components, settings, endpoints, onUpdat
 
       {/* Preview Grid */}
       <div 
-        // REMOVED: grid-cols-12
         className={`flex-grow grid w-full overflow-auto ${backgroundColor ? '' : 'bg-gray-900'}`}
         style={{ 
-          // ADDED: Explicit 24-column grid definition
+          // Explicitly set 24 columns to match GridContainer
           gridTemplateColumns: 'repeat(24, minmax(0, 1fr))',
           gridTemplateRows: `repeat(${minRows}, 20px)`,
           gridAutoRows: '20px',
@@ -71,7 +70,6 @@ export default function MergedPreview({ components, settings, endpoints, onUpdat
         }}
       >
         {components.length === 0 ? (
-          // Added col-span-full to make this message centered across all 24 columns
           <div className="col-span-full flex items-center justify-center text-gray-400">
             <div className="text-center">
               <Lucide.Layers size={48} className="mx-auto mb-4 opacity-50" />

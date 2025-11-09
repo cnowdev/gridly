@@ -17,10 +17,9 @@ export default function PreviewGrid({ components, settings }) {
 
   return (
     <div 
-      // REMOVED: grid-cols-24 (doesn't exist in standard Tailwind)
       className={`grid w-full min-h-full ${backgroundColor ? '' : 'bg-gray-900'}`}
       style={{ 
-        // ADDED: Explicit 24-column grid definition
+        // Explicitly set 24 columns
         gridTemplateColumns: 'repeat(24, minmax(0, 1fr))',
         gridTemplateRows: `repeat(${minRows}, 20px)`,
         gridAutoRows: '20px',
@@ -33,7 +32,6 @@ export default function PreviewGrid({ components, settings }) {
           <div
             key={comp.id}
             style={{
-              // Note: gridColumn/Row indices are 1-based in CSS Grid
               gridColumn: `${x + 1} / span ${w}`,
               gridRow: `${y + 1} / span ${h}`,
             }}
