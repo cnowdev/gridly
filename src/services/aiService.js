@@ -69,6 +69,7 @@ const fetchGeminiCode = async (
       code: '() => <div className="text-red-500 p-4">Error: Please set your API key in .env</div>',
       componentId: errorId,
       imageKeys: [],
+      layout: { w: 6, h: 4 }, // Return default layout
     };
   }
 
@@ -136,6 +137,12 @@ const fetchGeminiCode = async (
     ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ""}
 
     If the user's request conflicts with the design system, follow the user’s intent first.
+
+    ---
+    NEW: At the very end of your response, on a new line, provide a suggested layout in this *exact* format:
+    // LAYOUT: {"w": 6, "h": 4}
+    Choose 'w' (width) between 4 and 12 (out of 24 cols) and 'h' (height) between 3 and 10 (rows).
+    Choose a size that best fits the component's content.
 `;
 
   const fullPrompt = `${systemPrompt}\n\nUser prompt: ${prompt}`;
@@ -143,6 +150,28 @@ const fetchGeminiCode = async (
   // Generate component ID first
   const newComponentId = `comp-${Date.now()}`;
   let imageKeys = [];
+  let layout = { w: 6, h: 4 }; // Default layout
+  
+  // Helper to parse layout and clean code
+  const parseLayoutAndCleanCode = (rawCode) => {
+      let cleanCode = rawCode;
+      let parsedLayout = { ...layout }; // Start with default or already found layout
+      const layoutMatch = rawCode.match(/\/\/ LAYOUT: (\{.*\})/);
+      
+      if (layoutMatch && layoutMatch[1]) {
+          try {
+              const parsed = JSON.parse(layoutMatch[1]);
+              if (parsed.w && parsed.h) {
+                  parsedLayout = { w: parsed.w, h: parsed.h };
+              }
+          } catch (e) { /* ignore parse error, use default */ }
+          
+          // Remove the layout comment from the code
+          cleanCode = rawCode.replace(/\/\/ LAYOUT: \{.*\}/, '').trim();
+      }
+      return { cleanCode: cleanCode.trim(), layout: parsedLayout };
+  };
+
 
   try {
     const response = await genAI.models.generateContent({
@@ -208,14 +237,23 @@ const fetchGeminiCode = async (
         }
 
         Original user request: ${prompt}
+
+        ---
+        NEW: At the very end of your response, on a new line, provide a suggested layout in this *exact* format:
+        // LAYOUT: {"w": 6, "h": 4}
+        Choose 'w' (width) between 4 and 12 and 'h' (height) between 3 and 10.
         `;
 
         const componentResponse = await genAI.models.generateContent({
           model: "gemini-2.5-flash",
           contents: componentPrompt,
         });
+        
+        // Parse layout and code from the second prompt
+        const parsedResult = parseLayoutAndCleanCode(componentResponse.text.trim());
+        code = parsedResult.cleanCode;
+        layout = parsedResult.layout;
 
-        code = componentResponse.text.trim();
       } else {
         // If image generation failed, prompt for a fallback component
         const fallbackPrompt = `
@@ -233,6 +271,10 @@ const fetchGeminiCode = async (
         }
 
         Original user request: ${prompt}
+
+        ---
+        NEW: At the very end of your response, on a new line, provide a suggested layout in this *exact* format:
+        // LAYOUT: {"w": 4, "h": 3}
         `;
 
         const fallbackResponse = await genAI.models.generateContent({
@@ -240,8 +282,16 @@ const fetchGeminiCode = async (
           contents: fallbackPrompt,
         });
 
-        code = fallbackResponse.text.trim();
+        // Parse layout and code from the fallback prompt
+        const parsedResult = parseLayoutAndCleanCode(fallbackResponse.text.trim());
+        code = parsedResult.cleanCode;
+        layout = parsedResult.layout;
       }
+    } else {
+      // Regular code generation - parse layout and clean code
+      const parsedResult = parseLayoutAndCleanCode(code);
+      code = parsedResult.cleanCode;
+      layout = parsedResult.layout;
     }
 
     // Regular code generation - clean up markdown
@@ -253,6 +303,7 @@ const fetchGeminiCode = async (
       code: code.trim(),
       componentId: newComponentId,
       imageKeys,
+      layout, // Return the parsed layout
     };
   } catch (error) {
     console.error("Gemini API call failed:", error);
@@ -260,6 +311,7 @@ const fetchGeminiCode = async (
       code: `() => <div className="text-red-500 p-4">Error: ${error.message}</div>`,
       componentId: newComponentId,
       imageKeys: [],
+      layout: { w: 6, h: 4 }, // Return default layout
     };
   }
 };
