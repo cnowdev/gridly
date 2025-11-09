@@ -18,7 +18,7 @@ export default function ApiView({ apiState }) {
   } = apiState;
 
   const [expandedId, setExpandedId] = useState('base');
-  const [isTesterOpen, setIsTesterOpen] = useState(true);
+  const [isTesterOpen, setIsTesterOpen] = useState(false);
 
   const toggleExpand = (id) => {
     setExpandedId(expandedId === id ? null : id);

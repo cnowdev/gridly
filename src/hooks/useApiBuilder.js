@@ -35,6 +35,30 @@ const loadSavedState = () => {
   }
 };
 
+// --- NEW HELPER: Robust JSON Parser ---
+const safeJSONParse = (text) => {
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        // Attempt to fix common LLM JSON issues
+        try {
+             // 1. Try to extract JSON from code blocks if present
+             const match = text.match(/```json([\s\S]*?)```/);
+             if (match) {
+                 return JSON.parse(match[1]);
+             }
+             // 2. More aggressive cleanup if standard parse fails
+             // This is a basic example, for complex cases a dedicated library might be needed
+             const cleaned = text.replace(/[\u0000-\u001F]+/g, ""); 
+             return JSON.parse(cleaned);
+        } catch (e2) {
+             console.error("Failed to parse AI JSON even after cleanup:", text);
+             throw e; // Re-throw original error for the caller to handle
+        }
+    }
+}
+
+
 export function useApiBuilder() {
   // --- State ---
   const [baseServerCode, setBaseServerCode] = useState(() => {
@@ -204,8 +228,11 @@ export function useApiBuilder() {
 
       try {
           const result = await model.generateContent(systemPrompt);
-          const text = result.response.text().replace(/```json|```/g, '').trim();
-          const data = JSON.parse(text);
+          let text = result.response.text();
+          // Remove markdown fences before parsing
+          text = text.replace(/```json|```/g, '').trim();
+          
+          const data = safeJSONParse(text); // Use safe parser
           if (data.baseServerCode) {
               setBaseServerCode(data.baseServerCode);
           }
@@ -244,6 +271,7 @@ export function useApiBuilder() {
       7. **COMPLETE CODE ONLY:** Return complete \`app.METHOD(...)\` calls.
       8. **CLEAN DESCRIPTIONS:** Professional, concise descriptions only.
       9. **NO MARKDOWN:** Return PURE JSON.
+      10. **ESCAPE CAREFULLY:** When writing JavaScript code inside the JSON string, ensure ALL backslashes and quotes are properly escaped for JSON.
 
       Return STRICT JSON with an "actions" array (NO baseServerCode key):
       {
@@ -263,8 +291,11 @@ export function useApiBuilder() {
 
     try {
       const result = await model.generateContent(`${systemPrompt}\n\nUser Prompt: ${prompt}`);
-      const text = result.response.text().replace(/```json|```/g, '').trim();
-      const data = JSON.parse(text);
+      let text = result.response.text();
+      // Clean up markdown fences before parsing
+      text = text.replace(/```json|```/g, '').trim();
+      
+      const data = safeJSONParse(text); // Use safe parser
 
       if (data.actions) {
           setEndpoints(prev => {
@@ -326,6 +357,7 @@ export function useApiBuilder() {
       5. CLEAN DESCRIPTIONS.
       6. No external libraries.
       7. No markdown.
+      8. ESCAPE CAREFULLY: When writing JavaScript code inside the JSON string, ensure ALL backslashes and quotes are properly escaped for JSON.
       
       Current: ${endpointToEdit.method} ${endpointToEdit.path}
       Code: ${currentEditingCode}
@@ -336,8 +368,10 @@ export function useApiBuilder() {
 
     try {
         const result = await model.generateContent(systemPrompt);
-        const text = result.response.text().replace(/```json|```/g, '').trim();
-        const data = JSON.parse(text);
+        let text = result.response.text();
+        text = text.replace(/```json|```/g, '').trim();
+        const data = safeJSONParse(text); // Use safe parser
+        
         setCurrentEditingCode(data.code);
         setEndpoints(prev => prev.map(ep => ep.id === currentEditingEndpointId ? { ...ep, ...data } : ep));
     } catch (error) { console.error("AI edit failed:", error); } 

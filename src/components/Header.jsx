@@ -101,13 +101,7 @@ export default function Header({activeMode, setActiveMode, togglePreview, isPrev
                         </button>
                     </>
                 ) : (
-                    <button
-                        onClick={() => setIsApiViewOpen(true)}
-                        className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm flex items-center gap-2 transition-colors"
-                    >
-                        <Lucide.Server size={16} />
-                        API View
-                    </button>
+                    <></>
                 )}
             </div>
         </header>
