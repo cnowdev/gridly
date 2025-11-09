@@ -33,6 +33,13 @@ class VirtualServer {
       }
   }
 
+  // NEW METHOD
+  resetDB() {
+    this.db = {};
+    this.persistDB();
+    console.log("%cVirtualServer: DB FULLY RESET", "color: red; font-weight: bold;");
+  }
+
   reset() {
     // Only reset routes, NEVER the DB
     this.routes = {
