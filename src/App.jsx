@@ -315,7 +315,14 @@ export default function App() {
 
         <SettingsModal
           isOpen={grid.isSettingsOpen}
-          onClose={() => grid.setIsSettingsOpen(false)}
+          onClose={() => {
+            grid.setIsSettingsOpen(false);
+            // Set the flag and state to prevent the modal from re-opening
+            if (isFirstTime) {
+              localStorage.setItem('hasSeenSettingsWelcome', 'true');
+              setIsFirstTime(false);
+            }
+          }}
           settings={grid.settings || DEFAULT_SETTINGS}
           onSave={handleSaveSettingsWrapper}
           isFirstTime={isFirstTime}
