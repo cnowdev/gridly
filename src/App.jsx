@@ -13,6 +13,9 @@ import { useGridComponents } from './hooks/useGridComponents'
 import { useApiBuilder } from './hooks/useApiBuilder';
 import { DEFAULT_SETTINGS } from './settings';
 import PreviewGrid from './components/PreviewGrid';
+// Import the new merged export handler
+import { handleMergedExport } from './services/exportService';
+import * as Lucide from 'lucide-react';
 
 function getDrawingRect(start, end, scrollTop = 0, scrollLeft = 0) {
     if (!start || !end) return { display: 'none' };
@@ -43,13 +46,14 @@ export default function App() {
   const apiBuilder = useApiBuilder();
 
   const [isFirstTime, setIsFirstTime] = useState(false);
-  const [activeMode, setActiveMode] = useState('frontend'); // 'frontend' | 'backend' | 'merged'
+  const [activeMode, setActiveMode] = useState('frontend');
   const [isApiViewOpen, setIsApiViewOpen] = useState(false);
+  // NEW: State for tracking merged export progress
+  const [exportProgress, setExportProgress] = useState(null);
 
   // Auto-integrate when entering merged mode
   useEffect(() => {
     if (activeMode === 'merged' && grid.components.length > 0 && apiBuilder.endpoints.length > 0) {
-      // Only integrate if we don't have merged components yet
       if (grid.mergedComponents.length === 0) {
         grid.handleIntegrateWithAPI(apiBuilder.endpoints);
       }
@@ -86,12 +90,10 @@ export default function App() {
   };
 
   const mainRef = useRef(null);
-  // State to track the actual grid width for the modal
   const [currentGridWidth, setCurrentGridWidth] = useState(1200);
 
   useEffect(() => {
     if (!mainRef.current) return;
-    // Only observe resize if we are in frontend mode to avoid errors if mainRef changes
     if (activeMode !== 'frontend') return;
 
     const observer = new ResizeObserver(entries => {
@@ -103,7 +105,6 @@ export default function App() {
     });
 
     observer.observe(mainRef.current);
-    // Initial set
     if (mainRef.current) {
        const initialWidth = mainRef.current.clientWidth;
        grid.setGridWidth(initialWidth);
@@ -111,7 +112,7 @@ export default function App() {
     }
 
     return () => observer.disconnect();
-  }, [grid.setGridWidth, activeMode]); // Re-run when mode changes
+  }, [grid.setGridWidth, activeMode]);
 
   // --- Unified Submit Handler ---
   const handleUnifiedSubmit = (e) => {
@@ -144,18 +145,28 @@ export default function App() {
           apiBuilder.generateEndpoint(grid.chatPrompt);
           grid.setChatPrompt('');
       }
-      // No chat in merged mode
   };
 
   // --- Unified Export Handler ---
-  const handleUnifiedExport = () => {
+  const handleUnifiedExport = async () => {
       if (activeMode === 'frontend') {
-          grid.handleExport();
+          grid.handleExport(grid.components, grid.settings);
       } else if (activeMode === 'backend') {
           apiBuilder.exportApiCode();
       } else if (activeMode === 'merged') {
-          // TODO: Implement merged export
-          alert('Merged export coming soon!');
+          // Use the latest merged components if available, otherwise fallback to standard
+          const componentsToExport = grid.mergedComponents.length > 0 ? grid.mergedComponents : grid.components;
+          
+          // Get fresh server code
+          const serverCode = apiBuilder.generateServerCode();
+
+          // Run the merged export
+          await handleMergedExport(
+              componentsToExport, 
+              serverCode, 
+              grid.settings, 
+              setExportProgress // Pass setter to update progress UI
+          );
       }
   };
 
@@ -170,15 +181,18 @@ export default function App() {
                             linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
           background-size: 4.1666667% 20px;
         }
-
-        .react-grid-item > .react-resizable-handle {
-          z-index: 20;
-        }
-
-        .react-draggable-dragging .live-preview-wrapper {
-          pointer-events: none;
-        }
+        .react-grid-item > .react-resizable-handle { z-index: 20; }
+        .react-draggable-dragging .live-preview-wrapper { pointer-events: none; }
       `}</style>
+
+      {/* --- EXPORT PROGRESS OVERLAY --- */}
+      {exportProgress && (
+          <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center flex-col gap-4">
+              <Lucide.Loader2 size={48} className="text-blue-500 animate-spin" />
+              <p className="text-xl font-semibold text-white">{exportProgress}</p>
+              <p className="text-sm text-gray-400">This may take a minute...</p>
+          </div>
+      )}
 
       <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
         {/* ===== Header ===== */}
@@ -196,6 +210,7 @@ export default function App() {
             canRedo={grid.canRedo}
             setIsSettingsOpen={grid.setIsSettingsOpen}
             setIsApiViewOpen={setIsApiViewOpen}
+            isExporting={!!exportProgress} // Pass down loading state
         />
 
         {/* ===== Main Content Area ===== */}
@@ -239,10 +254,8 @@ export default function App() {
                 </>
              )
           ) : activeMode === 'backend' ? (
-             /* Backend Mode View */
              <ApiView apiState={apiBuilder} />
           ) : activeMode === 'merged' ? (
-             /* Merged Mode View */
              <MergedPreview 
                components={grid.mergedComponents.length > 0 ? grid.mergedComponents : grid.components}
                settings={grid.settings}
@@ -255,7 +268,7 @@ export default function App() {
           ) : null}
         </main>
 
-        {/* Chat Bar - Hidden in Preview Mode and Merged Mode */}
+        {/* Chat Bar */}
         {!(activeMode === 'frontend' && grid.isPreviewMode) && activeMode !== 'merged' && (
           <ChatBar
             prompt={grid.chatPrompt}
@@ -276,8 +289,6 @@ export default function App() {
           layout={grid.currentEditingLayout}
           gridWidth={currentGridWidth}
         />
-
-        {/* API ENDPOINT EDIT MODAL */}
         <ApiEndpointEditModal 
             isOpen={apiBuilder.isEditModalOpen}
             onClose={apiBuilder.closeEditModal}
@@ -295,7 +306,6 @@ export default function App() {
             setCode={apiBuilder.setCurrentEditingCode}
             onSave={apiBuilder.saveBaseEditModal}
         />
-
         <SettingsModal
           isOpen={grid.isSettingsOpen}
           onClose={() => grid.setIsSettingsOpen(false)}
