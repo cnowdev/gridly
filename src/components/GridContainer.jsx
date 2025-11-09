@@ -108,7 +108,7 @@ export default function GridContainer({
         ],
       }}
       breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-      cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+      cols={{ lg: 24, md: 20, sm: 12, xs: 8, xxs: 4 }}
       rowHeight={20}
       onLayoutChange={onLayoutChange}
       draggableCancel=".no-drag"

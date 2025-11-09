@@ -17,7 +17,7 @@ export default function PreviewGrid({ components, settings }) {
 
   return (
     <div 
-      className={`grid grid-cols-12 w-full min-h-full ${backgroundColor ? '' : 'bg-gray-900'}`}
+      className={`grid grid-cols-24 w-full min-h-full ${backgroundColor ? '' : 'bg-gray-900'}`}
       style={{ 
         gridTemplateRows: `repeat(${minRows}, 20px)`,
         gridAutoRows: '20px',

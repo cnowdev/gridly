@@ -124,7 +124,7 @@ export default function App() {
           background-color: #111827; /* gray-900 */
           background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
                             linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-          background-size: 8.333333% 20px;
+          background-size: 4.1666667% 20px;
         }
 
         .react-grid-item > .react-resizable-handle {
