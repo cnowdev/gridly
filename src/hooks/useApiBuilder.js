@@ -37,7 +37,6 @@ const loadSavedState = () => {
 
 export function useApiBuilder() {
   // --- 1. Lazy Initialization (Fixes persistence bug) ---
-  // We read from localStorage IMMEDIATELY when setting up the hook.
   const [baseServerCode, setBaseServerCode] = useState(() => {
      const saved = loadSavedState();
      return saved?.baseServerCode || '';
@@ -55,8 +54,6 @@ export function useApiBuilder() {
   const [currentEditingEndpointId, setCurrentEditingEndpointId] = useState(null);
   const [currentEditingCode, setCurrentEditingCode] = useState('');
 
-  // Use a ref to track if we have successfully loaded initially to prevent
-  // overwriting storage with empty data on extremely fast re-renders
   const isMounted = useRef(false);
 
   // --- VIRTUAL SERVER BOOTER ---
@@ -76,7 +73,6 @@ export function useApiBuilder() {
 
           const mockExpress = () => {
               const app = { ...baseMockApp };
-              // Use a getter to always ensure we have the latest DB reference from the singleton
               Object.defineProperty(app, 'db', {
                   get: () => virtualServer.db,
                   enumerable: true,
@@ -113,19 +109,20 @@ export function useApiBuilder() {
           `;
           
           try {
+              // --- FIX: ADDED 'module' AND 'exports' MOCKS ---
               const serverBootstrapper = new Function(
-                  'require', 'console',
+                  'require', 'console', 'module', 'exports',
                   combinedCode
               );
               
-              serverBootstrapper(mockRequire, console);
+              const mockModule = { exports: {} };
+              serverBootstrapper(mockRequire, console, mockModule, mockModule.exports);
               console.log("Virtual Server rebooted successfully.");
           } catch (error) {
               console.error("Failed to boot virtual server:", error);
           }
       };
 
-      // Always boot on initial load if we have endpoints, or when they change
       if (baseServerCode || endpoints.length > 0) {
           bootVirtualServer();
       }
@@ -139,14 +136,10 @@ export function useApiBuilder() {
       }
   }, []);
 
-  // --- Save State (Removed the Load State useEffect) ---
+  // --- Save State ---
   useEffect(() => {
-      // Simple check to ensure we don't save empty state over existing state
-      // on the very first render pass if something goes wrong.
       if (!isMounted.current) {
           isMounted.current = true;
-          // If we have nothing to save on mount, and storage is empty, that's fine.
-          // If storage had data, lazy init picked it up already.
       }
 
       try {

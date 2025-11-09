@@ -7,7 +7,7 @@ import CodeEditModal from './components/CodeEditModal';
 import SettingsModal from './components/SettingsModal';
 import ApiView from './components/ApiView';
 import ApiEndpointEditModal from './components/ApiEndpointEditModal'; // 👈 NEW IMPORT
-import { useGridComponents } from './utils';
+import { useGridComponents } from './hooks/useGridComponents'
 import { useApiBuilder } from './hooks/useApiBuilder';
 import { DEFAULT_SETTINGS } from './settings';
 import PreviewGrid from './components/PreviewGrid';
@@ -34,6 +34,48 @@ function getDrawingRect(start, end, scrollTop = 0, scrollLeft = 0) {
 }
 
 export default function App() {
+  const {
+    components,
+    placeholderLayout,
+    chatPrompt,
+    isLoading,
+    isModalOpen,
+    currentEditingCode,
+    currentEditingLayout,
+    settings,
+    isSettingsOpen,
+    setIsSettingsOpen,
+    handleSaveSettings,
+    isDrawing,
+    drawStart,
+    drawEnd,
+    showPlaceholder,
+    isPreviewMode,
+    setPlaceholderLayout,
+    setChatPrompt,
+    setCurrentEditingCode,
+    setGridWidth,
+    handlePromptSubmit,
+    handleLayoutChange,
+    openEditModal,
+    handleModalClose,
+    handleModalSave,
+    handleDeleteComponent,
+    handleToggleLock,
+    handleCodeEdit,
+    clearAllComponents,
+    handleExport,
+    handleGridMouseDown,
+    handleGridMouseMove,
+    handleGridMouseUp,
+    togglePreview,
+    handleCancelPlaceholder,
+    handleDuplicateComponent,
+    handleUndo,
+    handleRedo,
+    canUndo,
+    canRedo,
+  } = useGridComponents();
   // --- Frontend State ---
   const grid = useGridComponents();
   
@@ -42,6 +84,7 @@ export default function App() {
 
   const [isFirstTime, setIsFirstTime] = useState(false);
   const [activeMode, setActiveMode] = useState('frontend'); // 'frontend' | 'backend'
+  const [isApiViewOpen, setIsApiViewOpen] = useState(false);
 
   useEffect(() => {
     const hasSeenWelcome = localStorage.getItem('hasSeenSettingsWelcome');
