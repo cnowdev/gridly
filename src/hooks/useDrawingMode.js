@@ -16,7 +16,7 @@ export function useDrawingMode(gridWidth, setPlaceholderLayout, setShowPlacehold
 
   // Grid configuration constants (matching GridContainer.jsx)
   const ROW_HEIGHT = 20;
-  const COLS = 12;
+  const COLS = 24;
 
   /**
    * Initiates drawing mode when user clicks on empty grid space

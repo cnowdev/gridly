@@ -4,7 +4,7 @@ import * as Lucide from 'lucide-react';
 import { generateText } from '../services/aiService';
 
 // Default constants matching GridContainer.jsx
-const TOTAL_COLS = 12;
+const TOTAL_COLS = 24;
 const ROW_HEIGHT = 20;
 
 export default function CodeEditModal({ isOpen, onClose, code, setCode, onSave, onEditCode, layout, gridWidth }) {
@@ -117,7 +117,7 @@ export default function CodeEditModal({ isOpen, onClose, code, setCode, onSave, 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-10">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-10">
       <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl h-full max-h-[80vh] flex flex-col overflow-hidden ring-1 ring-gray-700">
         <div className="flex-shrink-0 flex justify-between items-center p-4 border-b border-gray-700">
           <h2 className="text-xl font-semibold text-white">Edit Component Code</h2>

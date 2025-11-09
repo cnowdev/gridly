@@ -18,7 +18,7 @@ const Component${idx} = ${comp.code};
 export default function App() {
   return (
     <div 
-      className="grid grid-cols-12 min-h-screen w-full"
+      className="grid grid-cols-24 min-h-screen w-full"
       style={{ 
         gridTemplateRows: 'repeat(${minRows}, 20px)',
         gridAutoRows: '20px',
