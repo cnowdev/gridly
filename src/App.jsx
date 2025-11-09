@@ -1,6 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import * as Lucide from 'lucide-react';
-import { motion } from 'framer-motion';
+import Header from './components/Header';
 
 import GridContainer from './components/GridContainer';
 import ChatBar from './components/ChatBar';
@@ -137,112 +136,21 @@ export default function App() {
 
       <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
         {/* ===== Header ===== */}
-        <header className="flex-shrink-0 p-4 bg-gray-800 border-b border-gray-700 shadow-md z-10 flex items-center justify-between">
-          {/* Title + Mode Toggle */}
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <Lucide.LayoutGrid className="text-blue-500" /> AI Grid Builder
-            </h1>
-
-            {/* Mode Toggle */}
-            <div className="relative flex items-center bg-gray-700 rounded-full px-1 py-1 text-sm font-medium w-[180px]">
-              <motion.div
-                className="absolute top-1 bottom-1 rounded-full bg-blue-600"
-                initial={false}
-                animate={{
-                  left: activeMode === 'frontend' ? '4px' : 'calc(50% + 2px)',
-                  width: 'calc(50% - 6px)',
-                }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-              />
-              <button
-                onClick={() => setActiveMode('frontend')}
-                className={`relative z-10 w-1/2 py-1.5 rounded-full transition-colors ${
-                  activeMode === 'frontend' ? 'text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Frontend
-              </button>
-              <button
-                onClick={() => setActiveMode('backend')}
-                className={`relative z-10 w-1/2 py-1.5 rounded-full transition-colors ${
-                  activeMode === 'backend' ? 'text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Backend
-              </button>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 items-center min-w-[460px] justify-end">
-            {activeMode === 'frontend' ? (
-              <>
-                <button
-                  onClick={grid.togglePreview}
-                  disabled={grid.components.length === 0}
-                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm flex items-center gap-2 transition-colors disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed"
-                  title={grid.isPreviewMode ? 'Exit Preview' : 'Preview'}
-                >
-                  {grid.isPreviewMode ? <Lucide.Edit size={16} /> : <Lucide.Eye size={16} />}
-                  {grid.isPreviewMode ? 'Edit Mode' : 'Preview'}
-                </button>
-
-                {!grid.isPreviewMode && (
-                  <button
-                    onClick={grid.clearAllComponents}
-                    className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-red-600 text-gray-200 hover:text-white font-medium text-sm flex items-center gap-2 transition-colors"
-                    title="Clear all components"
-                  >
-                    <Lucide.Trash2 size={16} />
-                    Clear All
-                  </button>
-                )}
-                 
-                 {/* Undo/Redo */}
-                 <div className="flex items-center gap-px rounded-lg overflow-hidden bg-gray-700 ring-1 ring-gray-600 ml-2 mr-2">
-                    <button
-                        onClick={grid.handleUndo}
-                        disabled={!grid.canUndo}
-                        className="p-2 text-white hover:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
-                        title="Undo (Ctrl+Z)"
-                    >
-                        <Lucide.Undo size={16} />
-                    </button>
-                    <button
-                        onClick={grid.handleRedo}
-                        disabled={!grid.canRedo}
-                        className="p-2 text-white hover:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
-                        title="Redo (Ctrl+Y)"
-                    >
-                        <Lucide.Redo size={16} />
-                    </button>
-                </div>
-              </>
-            ) : (
-               /* Backend specific buttons could go here if needed */
-               null
-            )}
-
-            <button
-              onClick={handleUnifiedExport}
-              disabled={activeMode === 'frontend' ? grid.components.length === 0 : (apiBuilder.endpoints.length === 0 && !apiBuilder.baseServerCode)}
-              className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-green-600 text-gray-200 hover:text-white font-medium text-sm flex items-center gap-2 transition-colors disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed"
-              title={activeMode === 'frontend' ? "Export as JSX" : "Export as server.js"}
-            >
-              <Lucide.Download size={16} />
-              {activeMode === 'frontend' ? 'Export JSX' : 'Export API'}
-            </button>
-
-            <button
-              onClick={() => grid.setIsSettingsOpen(true)}
-              className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 hover:text-white font-medium text-sm flex items-center gap-2 transition-colors"
-            >
-              <Lucide.Settings size={16} />
-              Settings
-            </button>
-          </div>
-        </header>
+        <Header 
+            activeMode={activeMode}
+            setActiveMode={setActiveMode}
+            togglePreview={togglePreview}
+            isPreviewMode={isPreviewMode}
+            components={components}
+            clearAllComponents={clearAllComponents}
+            handleExport={handleExport}
+            handleUndo={handleUndo}
+            canUndo={canUndo}
+            handleRedo={handleRedo}
+            canRedo={canRedo}
+            setIsSettingsOpen={setIsSettingsOpen}
+            setIsApiViewOpen={setIsApiViewOpen}
+        />
 
         {/* ===== Main Content Area ===== */}
         <main

@@ -5,11 +5,21 @@ export default function PreviewGrid({ components, settings }) {
   // Get background color from settings, if it exists.
   const backgroundColor = settings?.colors?.background;
 
+  // Calculate the last row to ensure grid fills the space
+  const maxRow = components.reduce((max, comp) => {
+    return Math.max(max, comp.layout.y + comp.layout.h);
+  }, 1);
+
+  // Calculate rows needed to fill viewport
+  // Account for header (60px) and ensure we fill the remaining space
+  const viewportRows = Math.ceil((window.innerHeight - 60) / 20);
+  const minRows = Math.max(maxRow, viewportRows);
+
   return (
     <div 
-      // Use bg-gray-900 only if no background color is defined in settings.
-      className={`grid grid-cols-12 min-h-screen content-start ${backgroundColor ? '' : 'bg-gray-900'}`}
+      className={`grid grid-cols-12 w-full min-h-full ${backgroundColor ? '' : 'bg-gray-900'}`}
       style={{ 
+        gridTemplateRows: `repeat(${minRows}, 20px)`,
         gridAutoRows: '20px',
         // Apply the background color if it exists
         ...(backgroundColor ? { backgroundColor } : {})
