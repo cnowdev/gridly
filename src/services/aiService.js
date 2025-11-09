@@ -69,6 +69,7 @@ const fetchGeminiCode = async (
       code: '() => <div className="text-red-500 p-4">Error: Please set your API key in .env</div>',
       componentId: errorId,
       imageKeys: [],
+      layout: { w: 6, h: 4 }, // Return default layout
     };
   }
 
@@ -127,6 +128,7 @@ const fetchGeminiCode = async (
     - Hooks ('useState', 'useEffect', 'useRef') are available.
     - Lucide icons are available as 'Lucide.IconName' (e.g., <Lucide.User />).
     - You also have access to async function generateText(prompt) for generating text content. Use this if you need to generate dynamic text content, like implementing a chatbot.
+    - If the user requests an image other than an AI-generated one, MAKE SURE TO FIND A VALID URL for the image and include it directly in an <img> tag.
 
     Before returning:
     - VERIFY that all navigation or core elements are visible.
@@ -135,7 +137,13 @@ const fetchGeminiCode = async (
 
     ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ""}
 
-    If the user's request conflicts with the design system, follow the user’s intent first.
+    If the user specifically asks for something different from the global design context, prioritize their request. If you feel like a color or font choice from the design system doesn't fit the component being generated, you can deviate from it as needed.
+
+    ---
+    NEW: At the very end of your response, on a new line, provide a suggested layout in this *exact* format:
+    // LAYOUT: {"w": 6, "h": 4}
+    Choose 'w' (width) between 4 and 12 (out of 24 cols) and 'h' (height) between 3 and 10 (rows).
+    Choose a size that best fits the component's content.
 `;
 
   const fullPrompt = `${systemPrompt}\n\nUser prompt: ${prompt}`;
@@ -143,6 +151,28 @@ const fetchGeminiCode = async (
   // Generate component ID first
   const newComponentId = `comp-${Date.now()}`;
   let imageKeys = [];
+  let layout = { w: 6, h: 4 }; // Default layout
+  
+  // Helper to parse layout and clean code
+  const parseLayoutAndCleanCode = (rawCode) => {
+      let cleanCode = rawCode;
+      let parsedLayout = { ...layout }; // Start with default or already found layout
+      const layoutMatch = rawCode.match(/\/\/ LAYOUT: (\{.*\})/);
+      
+      if (layoutMatch && layoutMatch[1]) {
+          try {
+              const parsed = JSON.parse(layoutMatch[1]);
+              if (parsed.w && parsed.h) {
+                  parsedLayout = { w: parsed.w, h: parsed.h };
+              }
+          } catch (e) { /* ignore parse error, use default */ }
+          
+          // Remove the layout comment from the code
+          cleanCode = rawCode.replace(/\/\/ LAYOUT: \{.*\}/, '').trim();
+      }
+      return { cleanCode: cleanCode.trim(), layout: parsedLayout };
+  };
+
 
   try {
     const response = await genAI.models.generateContent({
@@ -200,6 +230,8 @@ const fetchGeminiCode = async (
         
         Style the image appropriately with Tailwind CSS to fit the overall component design.
         Make sure the component fills its container (h-full w-full).
+        - If the user requests an image other than an AI-generated one, MAKE SURE TO FIND A VALID URL for the image and include it directly in an <img> tag.
+        If the user specifically asks for something different from the global design context, prioritize their request. If you feel like a color or font choice from the design system doesn't fit the component being generated, you can deviate from it as needed.
 
         ${
           designSystem
@@ -208,14 +240,23 @@ const fetchGeminiCode = async (
         }
 
         Original user request: ${prompt}
+
+        ---
+        NEW: At the very end of your response, on a new line, provide a suggested layout in this *exact* format:
+        // LAYOUT: {"w": 6, "h": 4}
+        Choose 'w' (width) between 4 and 12 and 'h' (height) between 3 and 10.
         `;
 
         const componentResponse = await genAI.models.generateContent({
           model: "gemini-2.5-flash",
           contents: componentPrompt,
         });
+        
+        // Parse layout and code from the second prompt
+        const parsedResult = parseLayoutAndCleanCode(componentResponse.text.trim());
+        code = parsedResult.cleanCode;
+        layout = parsedResult.layout;
 
-        code = componentResponse.text.trim();
       } else {
         // If image generation failed, prompt for a fallback component
         const fallbackPrompt = `
@@ -233,6 +274,10 @@ const fetchGeminiCode = async (
         }
 
         Original user request: ${prompt}
+
+        ---
+        NEW: At the very end of your response, on a new line, provide a suggested layout in this *exact* format:
+        // LAYOUT: {"w": 4, "h": 3}
         `;
 
         const fallbackResponse = await genAI.models.generateContent({
@@ -240,8 +285,16 @@ const fetchGeminiCode = async (
           contents: fallbackPrompt,
         });
 
-        code = fallbackResponse.text.trim();
+        // Parse layout and code from the fallback prompt
+        const parsedResult = parseLayoutAndCleanCode(fallbackResponse.text.trim());
+        code = parsedResult.cleanCode;
+        layout = parsedResult.layout;
       }
+    } else {
+      // Regular code generation - parse layout and clean code
+      const parsedResult = parseLayoutAndCleanCode(code);
+      code = parsedResult.cleanCode;
+      layout = parsedResult.layout;
     }
 
     // Regular code generation - clean up markdown
@@ -253,6 +306,7 @@ const fetchGeminiCode = async (
       code: code.trim(),
       componentId: newComponentId,
       imageKeys,
+      layout, // Return the parsed layout
     };
   } catch (error) {
     console.error("Gemini API call failed:", error);
@@ -260,6 +314,7 @@ const fetchGeminiCode = async (
       code: `() => <div className="text-red-500 p-4">Error: ${error.message}</div>`,
       componentId: newComponentId,
       imageKeys: [],
+      layout: { w: 6, h: 4 }, // Return default layout
     };
   }
 };
@@ -327,8 +382,10 @@ ${otherComponentsContext}
     Return the entire new component function only. DO NOT include exports, imports, or code fences.
     Use Tailwind CSS for styling. Hooks are available in scope. All Lucide icons are available under 
     the 'Lucide' namespace (e.g., <Lucide.User />, <Lucide.Bell />, etc).
-
+    - If the user requests an image other than an AI-generated one, MAKE SURE TO FIND A VALID URL for the image and include it directly in an <img> tag.
     ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ""}
+
+    If the user specifically asks for something different from the global design context, prioritize their request. If you feel like a color or font choice from the design system doesn't fit the component being generated, you can deviate from it as needed.
 
     ${gridContext} 
 
@@ -389,9 +446,11 @@ ${otherComponentsContext}
         - Use w-full to control width
         - Use h-full to ensure it fills the container height
         - Consider using rounded corners (rounded-lg, rounded-xl) for aesthetics
-        
+        - If the user requests an image other than an AI-generated one, MAKE SURE TO FIND A VALID URL for the image and include it directly in an <img> tag.
         Style the image appropriately with Tailwind CSS to fit the component's design.
         Make sure the component fills its container (h-full w-full).
+
+        If the user specifically asks for something different from the global design context, prioritize their request. If you feel like a color or font choice from the design system doesn't fit the component being generated, you can deviate from it as needed.
 
         ${designSystem ? `DESIGN CONTEXT:\n${designSystem}\n` : ""}
         ${gridContext}
