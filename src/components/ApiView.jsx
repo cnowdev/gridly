@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import * as Lucide from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -12,6 +11,10 @@ export default function ApiView({ apiState }) {
     deleteEndpoint,
     openEditModal,
     testEndpoint,
+    // New props for base server
+    openBaseEditModal,
+    resetBaseServerCode,
+    isApiLoading,
   } = apiState;
 
   const [expandedId, setExpandedId] = useState('base');
@@ -58,39 +61,76 @@ export default function ApiView({ apiState }) {
                         <Lucide.Server size={48} className="mx-auto mb-4 opacity-50" />
                         <h2 className="text-xl font-semibold mb-2">No Endpoints Yet</h2>
                         <p>Use the chat bar below to generate your first Node.js/Express API endpoint.</p>
+                        <p className="text-sm mt-4">You can also ask to "reset base server code" to get started.</p>
                     </div>
                 )}
 
-                {baseServerCode && (
+                {/* --- Base Server Setup Card --- */}
                 <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
-                    <button
-                    onClick={() => toggleExpand('base')}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-750 transition-colors text-left"
+                    <div
+                        className="w-full flex items-center justify-between p-4 hover:bg-gray-750/50 transition-colors text-left"
                     >
-                    <div className="flex items-center gap-3">
-                        <Lucide.Box size={20} className="text-blue-400" />
-                        <div>
-                        <h3 className="font-semibold">Base Server Setup</h3>
-                        <p className="text-sm text-gray-400">Initial configuration</p>
+                        <button 
+                            onClick={() => toggleExpand('base')}
+                            // --- FIX: Changed items-center to items-start ---
+                            className="flex-1 flex items-start gap-3 min-w-0" 
+                        >
+                            {/* Added mt-0.5 to nudge icon down slightly for optical alignment */}
+                            <Lucide.Box size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />
+                            <div className="min-w-0">
+                                <h3 className="font-semibold">Base Server Setup</h3>
+                                <p className="text-sm text-gray-400 truncate">
+                                    {baseServerCode ? 'Imports, middleware, and app config' : 'Click Reset to generate base code'}
+                                </p>
+                            </div>
+                        </button>
+
+                        {/* Base Server Action Buttons */}
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                            <button
+                                onClick={openBaseEditModal}
+                                className="p-2 text-gray-400 hover:text-blue-400 transition-colors"
+                                title="Edit Base Code"
+                            >
+                                <Lucide.Pencil size={18} />
+                            </button>
+                            <button
+                                onClick={resetBaseServerCode}
+                                disabled={isApiLoading}
+                                className="p-2 text-gray-400 hover:text-yellow-400 transition-colors disabled:opacity-50"
+                                title="Reset Base Code (AI)"
+                            >
+                                {isApiLoading ? <Lucide.Loader2 size={18} className="animate-spin" /> : <Lucide.RotateCcw size={18} />}
+                            </button>
+                            <button
+                                onClick={() => toggleExpand('base')}
+                                className="p-2 text-gray-400 hover:text-white transition-colors"
+                            >
+                                {expandedId === 'base' ? <Lucide.ChevronUp size={20} /> : <Lucide.ChevronDown size={20} />}
+                            </button>
                         </div>
                     </div>
-                    {expandedId === 'base' ? <Lucide.ChevronUp size={20} /> : <Lucide.ChevronDown size={20} />}
-                    </button>
                     
                     {expandedId === 'base' && (
                     <div className="border-t border-gray-700">
-                        <SyntaxHighlighter 
-                            language="javascript" 
-                            style={vscDarkPlus}
-                            customStyle={{ margin: 0, borderRadius: 0, fontSize: '14px' }}
-                        >
-                        {baseServerCode}
-                        </SyntaxHighlighter>
+                        {baseServerCode ? (
+                            <SyntaxHighlighter 
+                                language="javascript" 
+                                style={vscDarkPlus}
+                                customStyle={{ margin: 0, borderRadius: 0, fontSize: '14px', background: '#1E1E1E' }}
+                            >
+                                {baseServerCode}
+                            </SyntaxHighlighter>
+                        ) : (
+                            <div className="p-4 text-center text-gray-500 text-sm">
+                                No base server code defined. Click the "Reset" button to generate it.
+                            </div>
+                        )}
                     </div>
                     )}
                 </div>
-                )}
 
+                {/* --- Endpoints List --- */}
                 {endpoints.map((ep) => (
                 <div key={ep.id} className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:border-gray-600 transition-colors">
                     <div className="flex items-center justify-between p-4 gap-4">
@@ -102,7 +142,6 @@ export default function ApiView({ apiState }) {
                             <code className="text-sm bg-gray-900 px-2 py-1 rounded text-blue-300 font-mono flex-shrink-0">
                                 {ep.path}
                             </code>
-                            {/* Added title attribute here for tooltip */}
                             <span className="text-gray-400 text-sm truncate" title={ep.description}>
                                 {ep.description}
                             </span>
@@ -137,7 +176,7 @@ export default function ApiView({ apiState }) {
                         <SyntaxHighlighter 
                             language="javascript" 
                             style={vscDarkPlus}
-                            customStyle={{ margin: 0, borderRadius: 0, fontSize: '14px' }}
+                            customStyle={{ margin: 0, borderRadius: 0, fontSize: '14px', background: '#1E1E1E' }}
                         >
                         {ep.code}
                         </SyntaxHighlighter>
