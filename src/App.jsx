@@ -201,22 +201,6 @@ export default function App() {
                   className="px-3 py-1.5 rounded-lg hover:bg-green-600 text-gray-200 hover:text-white font-medium text-sm flex items-center gap-2 transition-colors disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed"
                   title="Export as JSX"
                 >
-                    {isPreviewMode ? (
-                        <PreviewGrid components={components} settings={settings} />
-                    ) : (
-                        <>
-                        <GridContainer
-                            components={components}
-                            onLayoutChange={handleLayoutChange}
-                            onDeleteComponent={handleDeleteComponent}
-                            openEditModal={openEditModal}
-                            onToggleLock={handleToggleLock}
-                            placeholderLayout={placeholderLayout}
-                            onPlaceholderLayoutChange={setPlaceholderLayout}
-                            showPlaceholder={showPlaceholder}
-                            onCancelPlaceholder={handleCancelPlaceholder}
-                            onDuplicateComponent={handleDuplicateComponent}
-                        />
                   <Lucide.Download size={16} />
                   Export JSX
                 </button>
