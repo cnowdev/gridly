@@ -6,9 +6,9 @@ export default function Header({activeMode, setActiveMode, togglePreview, isPrev
         <header className="flex-shrink-0 p-4 bg-gray-800 border-b border-gray-700 shadow-md z-10 flex items-center justify-between">
             {/* ===== Title + Mode Toggle ===== */}
             <div className="flex items-center gap-4">
-                <h1 className="text-xl font-bold flex items-center gap-2">
-                    <Lucide.LayoutGrid className="text-blue-500" /> AI Grid Builder
-                </h1>
+                <img src="/gridly.svg" alt="Gridly Logo" className="h-7" />
+
+                <h1 className="text-xl font-bold flex items-center gap-2"> gridly </h1>
 
                 {/* ===== Animated Mode Toggle ===== */}
                 <div className="relative flex items-center bg-gray-700 rounded-full px-1 py-1 text-sm font-medium w-[180px]">
