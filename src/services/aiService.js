@@ -126,6 +126,8 @@ const fetchGeminiCode = async (
     - Use Tailwind utilities for hierarchy, spacing, and layout.
     - Hooks ('useState', 'useEffect', 'useRef') are available.
     - Lucide icons are available as 'Lucide.IconName' (e.g., <Lucide.User />).
+    - You also have access to async function generateText(prompt) for generating text content. Use this if you need to generate dynamic text content, like implementing a chatbot.
+    - If the user needs non-AI generated images, make sure the image URLs are valid and load correctly.
 
     Before returning:
     - VERIFY that all navigation or core elements are visible.
@@ -134,7 +136,13 @@ const fetchGeminiCode = async (
 
     ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ""}
 
-    If the user's request conflicts with the design system, follow the user’s intent first.
+    If the user specifically asks for something different from the global design context, prioritize their request. If you feel like a color or font choice from the design system doesn't fit the component being generated, you can deviate from it as needed.
+
+    ---
+    NEW: At the very end of your response, on a new line, provide a suggested layout in this *exact* format:
+    // LAYOUT: {"w": 6, "h": 4}
+    Choose 'w' (width) between 4 and 12 (out of 24 cols) and 'h' (height) between 3 and 10 (rows).
+    Choose a size that best fits the component's content.
 `;
 
   const fullPrompt = `${systemPrompt}\n\nUser prompt: ${prompt}`;
@@ -326,9 +334,11 @@ ${otherComponentsContext}
     Return the entire new component function only. DO NOT include exports, imports, or code fences.
     Use Tailwind CSS for styling. Hooks are available in scope. All Lucide icons are available under 
     the 'Lucide' namespace (e.g., <Lucide.User />, <Lucide.Bell />, etc).
+    - If the user needs non-AI generated images, make sure the image URLs are valid and load correctly.
 
     ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ""}
 
+    If the user specifically asks for something different from the global design context, prioritize their request. If you feel like a color or font choice from the design system doesn't fit the component being generated, you can deviate from it as needed.
     ${gridContext} 
 
     Current code (for component "${currentEditingId}"):
