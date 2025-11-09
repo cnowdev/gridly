@@ -196,6 +196,18 @@ export function useApiBuilder() {
     closeBaseEditModal();
   };
 
+  // NEW FUNCTION
+  const clearAll = useCallback(() => {
+    if (
+      window.confirm(
+        "Are you sure? This will delete ALL endpoints and clear the database."
+      )
+    ) {
+      setEndpoints([]);
+      virtualServer.resetDB();
+    }
+  }, []);
+
   const resetBaseServerCode = async () => {
     if (!model) {
       alert("Gemini API Key is not set.");
@@ -355,7 +367,37 @@ export function useApiBuilder() {
 
     // Re-use the main handler but with a specific "generate everything" prompt
     await handleApiPrompt(
-      "Analyze ALL provided frontend components. Generate a COMPLETE set of necessary API endpoints (CRUD, etc.) to make them fully functional. DO NOT delete existing endpoints unless they strictly conflict.",
+      `CRITICAL RULES FOR VIRTUAL ENVIRONMENT:
+      1. **CHECK FOR DUPLICATES:** Before creating, check if an endpoint with the *exact* same method and path exists. If yes, use action type 'update' with its 'id'.
+      2. **NO EXTERNAL LIBRARIES:** Only 'express' via \`require()\`.
+      3. **USE CORS PROXY:** Route external requests through \`https://corsproxy.io/?\` + encodeURIComponent(url).
+      4. **ROBUST FALLBACK:** External fetches MIGHT fail. You MUST wrap them in \`try/catch\`.
+      5. **REALISTIC SILENT FALLBACKS:** In the \`catch\` block, return REALISTIC literal data. 
+         - DO NOT use words like 'mock', 'fake', 'fallback', or 'error' in the data OR comments.
+         - Make it look like standard data (e.g., \`res.json({ temp: '22°C', condition: 'Sunny' })\`).
+      6. **SHARED STATE:** Use \`app.db\` for ALL shared data.
+      7. **COMPLETE CODE ONLY:** Return complete \`app.METHOD(...)\` calls.
+      8. **CLEAN DESCRIPTIONS:** Professional, concise descriptions only.
+      9. **NO MARKDOWN:** Return PURE JSON.
+      10. **ESCAPE CAREFULLY:** When writing JavaScript code inside the JSON string, ensure ALL backslashes and quotes are properly escaped for JSON.
+
+      Return STRICT JSON with an "actions" array (NO baseServerCode key):
+      {
+        "actions": [
+          {
+            "type": "create",
+            "data": { "method": "GET", "path": "/path", "description": "...", "code": "app.get(...)" }
+          },
+          {
+            "type": "update",
+            "id": "ep-12345",
+            "data": { "method": "POST", "path": "/newpath", "description": "...", "code": "app.post(...)" }
+          }
+        ]
+      }
+
+
+      Analyze ALL provided frontend components. Generate a COMPLETE set of necessary API endpoints (CRUD, etc.) to make them fully functional. DO NOT delete existing endpoints unless they strictly conflict.`,
       frontendComponents
     );
   };
@@ -500,5 +542,6 @@ if (typeof app.db === 'undefined') {
     setCurrentEditingBaseCode,
     saveBaseEditModal,
     resetBaseServerCode,
+    clearAll,
   };
 }
