@@ -19,8 +19,8 @@ function getDrawingRect(start, end, scrollTop = 0, scrollLeft = 0) {
     
     const left = Math.min(start.x, end.x) - scrollLeft;
     const top = Math.min(start.y, end.y) - scrollTop;
-    const width = Math.abs(start.x - end.x);
-    const height = Math.abs(start.y - end.y);
+    const width = Math.abs(start.x, end.x);
+    const height = Math.abs(start.y, end.y);
 
     return {
         position: 'absolute',
@@ -54,7 +54,7 @@ export default function App() {
         grid.handleIntegrateWithAPI(apiBuilder.endpoints);
       }
     }
-  }, [activeMode]);
+  }, [activeMode, grid, apiBuilder.endpoints]);
 
   // Re-integrate when endpoints or components change while in merged mode
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function App() {
       // Optionally auto-refresh when data changes
       // You might want to add a manual refresh button instead
     }
-  }, [apiBuilder.endpoints.length, grid.components.length]);
+  }, [apiBuilder.endpoints.length, grid.components.length, activeMode, grid.mergedComponents.length]);
 
   useEffect(() => {
     const hasSeenWelcome = localStorage.getItem('hasSeenSettingsWelcome');
@@ -113,12 +113,33 @@ export default function App() {
     return () => observer.disconnect();
   }, [grid.setGridWidth, activeMode]); // Re-run when mode changes
 
-  // --- Unified Submit Handler ---
+  // --- MODIFIED: Unified Submit Handler ---
   const handleUnifiedSubmit = (e) => {
+      e.preventDefault(); // Moved here, as it's common to all
+      
       if (activeMode === 'frontend') {
-          grid.handlePromptSubmit(e);
+          const prompt = grid.chatPrompt.toLowerCase();
+          
+          // --- NEW: Heuristic for detecting a global edit prompt ---
+          const isGlobalEdit = [
+              'all components', 
+              'every component', 
+              'dark mode', 
+              'light mode',
+              'theme',
+              'global',
+              'update all'
+          ].some(keyword => prompt.includes(keyword));
+          
+          if (isGlobalEdit && grid.components.length > 0) {
+              // Call the new global prompt handler
+              grid.handleGlobalPromptSubmit(e);
+          } else {
+              // Call the normal "new component" prompt handler
+              grid.handlePromptSubmit(e);
+          }
+          
       } else if (activeMode === 'backend') {
-          e.preventDefault();
           if (!grid.chatPrompt.trim()) return;
           apiBuilder.generateEndpoint(grid.chatPrompt);
           grid.setChatPrompt('');
@@ -144,7 +165,7 @@ export default function App() {
     <>
        <style>{`
         .layout {
-          background-color: #111827; /* gray-900 */
+          background-color: ${grid.settings?.colors?.background || '#111827'};
           background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
                             linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
           background-size: 4.1666667% 20px;
@@ -181,11 +202,12 @@ export default function App() {
         <main
           ref={mainRef}
           // Only attach grid handlers in frontend mode
-          onMouseDown={activeMode === 'frontend' ? grid.handleGridMouseDown : undefined}
-          onMouseMove={activeMode === 'frontend' ? grid.handleGridMouseMove : undefined}
-          onMouseUp={activeMode === 'frontend' ? grid.handleGridMouseUp : undefined}
-          onMouseLeave={activeMode === 'frontend' ? grid.handleGridMouseUp : undefined}
+          onMouseDown={activeMode === 'frontend' && !grid.isPreviewMode ? grid.handleGridMouseDown : undefined}
+          onMouseMove={activeMode === 'frontend' && !grid.isPreviewMode ? grid.handleGridMouseMove : undefined}
+          onMouseUp={activeMode === 'frontend' && !grid.isPreviewMode ? grid.handleGridMouseUp : undefined}
+          onMouseLeave={activeMode === 'frontend' && !grid.isPreviewMode ? grid.handleGridMouseUp : undefined}
           className="flex-grow overflow-auto relative"
+          style={{ backgroundColor: grid.settings?.colors?.background || '#111827' }} // Apply background color
         >
           {activeMode === 'frontend' ? (
              grid.isPreviewMode ? (
@@ -266,7 +288,6 @@ export default function App() {
             isAiLoading={apiBuilder.isApiLoading}
         />
 
-        {/* --- FIX: ADDED MISSING BASE SERVER MODAL --- */}
         <BaseServerEditModal 
             isOpen={apiBuilder.isBaseEditModalOpen}
             onClose={apiBuilder.closeBaseEditModal}
