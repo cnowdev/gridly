@@ -2,7 +2,7 @@
 import { loadState, saveState } from "../services/storageService";
 import { clearAllImages } from "../lib/imageStorage";
 import { handleExport } from "../services/exportService";
-import { fetchGeminiCode, handleCodeEdit} from '../services/aiService'
+import { fetchGeminiCode, handleCodeEdit, integrateComponentsWithAPI } from '../services/aiService'
 import { useState, useEffect } from 'react';
 import { useImageCache } from './useImageCache';
 import { useSettings } from './useSettings';
@@ -35,6 +35,17 @@ export function useGridComponents() {
   const [chatPrompt, setChatPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
+  const [isMergedIntegrating, setIsMergedIntegrating] = useState(false);
+  const [mergedComponents, setMergedComponents] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gridly-merged-components');
+      return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+      console.error('Failed to load merged components:', error);
+      return [];
+    }
+  });
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentEditingCode, setCurrentEditingCode] = useState('');
   const [currentEditingId, setCurrentEditingId] = useState(null);
@@ -61,6 +72,15 @@ export function useGridComponents() {
   useEffect(() => {
     saveState(components, placeholderLayout);
   }, [components, placeholderLayout]);
+
+  // Save merged components to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('gridly-merged-components', JSON.stringify(mergedComponents));
+    } catch (error) {
+      console.error('Failed to save merged components:', error);
+    }
+  }, [mergedComponents]);
 
   const [gridWidth, setGridWidth] = useState(1200);
   const [showPlaceholder, setShowPlaceholder] = useState(false);
@@ -206,6 +226,23 @@ export function useGridComponents() {
         return c;
       })
     );
+    
+    // Also update merged components if they exist
+    setMergedComponents((prev) =>
+      prev.map((c) => {
+        if (c.id === currentEditingId) {
+          const imageKeys = [];
+          for (const [key, data] of imageCache.entries()) {
+            if (currentEditingCode.includes(data.url)) {
+              imageKeys.push(key);
+            }
+          }
+          return { ...c, code: currentEditingCode, imageKeys };
+        }
+        return c;
+      })
+    );
+    
     handleModalClose();
   };
 
@@ -255,6 +292,7 @@ export function useGridComponents() {
     }
     await clearAllImages(); // Clear all from IndexedDB
     setComponentsWithHistory([]);
+    setMergedComponents([]); // Also clear merged components
     setPlaceholderLayout({ i: 'placeholder', x: 0, y: 0, w: 4, h: 2 });
   };
 
@@ -272,6 +310,29 @@ export function useGridComponents() {
 
   const togglePreview = () => {
     setIsPreviewMode(!isPreviewMode);
+  };
+
+  const handleIntegrateWithAPI = async (endpoints) => {
+    if (components.length === 0) {
+      alert('No components to integrate!');
+      return;
+    }
+
+    if (endpoints.length === 0) {
+      alert('No API endpoints available to integrate!');
+      return;
+    }
+
+    setIsMergedIntegrating(true);
+    try {
+      const integrated = await integrateComponentsWithAPI(components, endpoints, settings);
+      setMergedComponents(integrated);
+    } catch (error) {
+      console.error('Integration failed:', error);
+      alert('Failed to integrate components with API. Check console for details.');
+    } finally {
+      setIsMergedIntegrating(false);
+    }
   };
 
   return {
@@ -316,5 +377,8 @@ export function useGridComponents() {
     handleRedo,
     canUndo,
     canRedo,
+    isMergedIntegrating,
+    mergedComponents,
+    handleIntegrateWithAPI,
   };
 }

@@ -7,7 +7,8 @@ import CodeEditModal from './components/CodeEditModal';
 import SettingsModal from './components/SettingsModal';
 import ApiView from './components/ApiView';
 import ApiEndpointEditModal from './components/ApiEndpointEditModal';
-import BaseServerEditModal from './components/BaseServerEditModal'; // 👈 Make sure this is imported
+import BaseServerEditModal from './components/BaseServerEditModal';
+import MergedPreview from './components/MergedPreview';
 import { useGridComponents } from './hooks/useGridComponents'
 import { useApiBuilder } from './hooks/useApiBuilder';
 import { DEFAULT_SETTINGS } from './settings';
@@ -42,8 +43,26 @@ export default function App() {
   const apiBuilder = useApiBuilder();
 
   const [isFirstTime, setIsFirstTime] = useState(false);
-  const [activeMode, setActiveMode] = useState('frontend'); // 'frontend' | 'backend'
+  const [activeMode, setActiveMode] = useState('frontend'); // 'frontend' | 'backend' | 'merged'
   const [isApiViewOpen, setIsApiViewOpen] = useState(false);
+
+  // Auto-integrate when entering merged mode
+  useEffect(() => {
+    if (activeMode === 'merged' && grid.components.length > 0 && apiBuilder.endpoints.length > 0) {
+      // Only integrate if we don't have merged components yet
+      if (grid.mergedComponents.length === 0) {
+        grid.handleIntegrateWithAPI(apiBuilder.endpoints);
+      }
+    }
+  }, [activeMode]);
+
+  // Re-integrate when endpoints or components change while in merged mode
+  useEffect(() => {
+    if (activeMode === 'merged' && grid.mergedComponents.length > 0) {
+      // Optionally auto-refresh when data changes
+      // You might want to add a manual refresh button instead
+    }
+  }, [apiBuilder.endpoints.length, grid.components.length]);
 
   useEffect(() => {
     const hasSeenWelcome = localStorage.getItem('hasSeenSettingsWelcome');
@@ -98,24 +117,28 @@ export default function App() {
   const handleUnifiedSubmit = (e) => {
       if (activeMode === 'frontend') {
           grid.handlePromptSubmit(e);
-      } else {
+      } else if (activeMode === 'backend') {
           e.preventDefault();
           if (!grid.chatPrompt.trim()) return;
           apiBuilder.generateEndpoint(grid.chatPrompt);
           grid.setChatPrompt('');
       }
+      // No chat in merged mode
   };
 
   // --- Unified Export Handler ---
   const handleUnifiedExport = () => {
       if (activeMode === 'frontend') {
           grid.handleExport();
-      } else {
+      } else if (activeMode === 'backend') {
           apiBuilder.exportApiCode();
+      } else if (activeMode === 'merged') {
+          // TODO: Implement merged export
+          alert('Merged export coming soon!');
       }
   };
 
-  const isAnyLoading = grid.isLoading || apiBuilder.isApiLoading;
+  const isAnyLoading = grid.isLoading || apiBuilder.isApiLoading || grid.isMergedIntegrating;
 
   return (
     <>
@@ -193,14 +216,25 @@ export default function App() {
                   )}
                 </>
              )
-          ) : (
+          ) : activeMode === 'backend' ? (
              /* Backend Mode View */
              <ApiView apiState={apiBuilder} />
-          )}
+          ) : activeMode === 'merged' ? (
+             /* Merged Mode View */
+             <MergedPreview 
+               components={grid.mergedComponents.length > 0 ? grid.mergedComponents : grid.components}
+               settings={grid.settings}
+               endpoints={apiBuilder.endpoints}
+               onUpdateComponents={() => grid.handleIntegrateWithAPI(apiBuilder.endpoints)}
+               isUpdating={grid.isMergedIntegrating}
+               testEndpoint={apiBuilder.testEndpoint}
+               onEditComponent={grid.openEditModal}
+             />
+          ) : null}
         </main>
 
-        {/* Chat Bar - Hidden in Preview Mode, visible in both Edit Frontend & Backend */}
-        {!(activeMode === 'frontend' && grid.isPreviewMode) && (
+        {/* Chat Bar - Hidden in Preview Mode and Merged Mode */}
+        {!(activeMode === 'frontend' && grid.isPreviewMode) && activeMode !== 'merged' && (
           <ChatBar
             prompt={grid.chatPrompt}
             setPrompt={grid.setChatPrompt}

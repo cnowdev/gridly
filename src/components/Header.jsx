@@ -10,30 +10,42 @@ export default function Header({activeMode, setActiveMode, togglePreview, isPrev
 
                 <h1 className="text-xl font-bold flex items-center gap-2"> gridly </h1>
 
-                {/* ===== Animated Mode Toggle ===== */}
-                <div className="relative flex items-center bg-gray-700 rounded-full px-1 py-1 text-sm font-medium w-[180px]">
+                {/* ===== Animated Mode Toggle (3 options) ===== */}
+                <div className="relative flex items-center bg-gray-700 rounded-full px-1 py-1 text-sm font-medium w-[270px]">
                     <motion.div
                         className="absolute top-1 bottom-1 rounded-full bg-blue-600"
                         initial={false}
                         animate={{
-                            left: activeMode === 'frontend' ? '4px' : 'calc(50% + 2px)',
-                            width: 'calc(50% - 6px)',
+                            left: activeMode === 'frontend' ? '4px' : 
+                                  activeMode === 'backend' ? 'calc(33.333% + 2px)' : 
+                                  'calc(66.666% + 0px)',
+                            width: 'calc(33.333% - 6px)',
                         }}
                         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                     />
                     <button
                         onClick={() => setActiveMode('frontend')}
-                        className={`relative z-10 w-1/2 py-1.5 rounded-full transition-colors ${activeMode === 'frontend' ? 'text-white' : 'text-gray-400 hover:text-white'
-                            }`}
+                        className={`relative z-10 w-1/3 py-1.5 rounded-full transition-colors ${
+                            activeMode === 'frontend' ? 'text-white' : 'text-gray-400 hover:text-white'
+                        }`}
                     >
                         Frontend
                     </button>
                     <button
                         onClick={() => setActiveMode('backend')}
-                        className={`relative z-10 w-1/2 py-1.5 rounded-full transition-colors ${activeMode === 'backend' ? 'text-white' : 'text-gray-400 hover:text-white'
-                            }`}
+                        className={`relative z-10 w-1/3 py-1.5 rounded-full transition-colors ${
+                            activeMode === 'backend' ? 'text-white' : 'text-gray-400 hover:text-white'
+                        }`}
                     >
                         Backend
+                    </button>
+                    <button
+                        onClick={() => setActiveMode('merged')}
+                        className={`relative z-10 w-1/3 py-1.5 rounded-full transition-colors ${
+                            activeMode === 'merged' ? 'text-white' : 'text-gray-400 hover:text-white'
+                        }`}
+                    >
+                        Merged
                     </button>
                 </div>
             </div>
@@ -98,6 +110,18 @@ export default function Header({activeMode, setActiveMode, togglePreview, isPrev
                         >
                             <Lucide.Settings size={16} />
                             Settings
+                        </button>
+                    </>
+                ) : activeMode === 'merged' ? (
+                    <>
+                        <button
+                            onClick={handleExport}
+                            disabled={components.length === 0}
+                            className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-medium text-sm flex items-center gap-2 transition-colors"
+                            title="Export Merged Project (Coming Soon)"
+                        >
+                            <Lucide.PackageOpen size={16} />
+                            Export Full Project
                         </button>
                     </>
                 ) : (

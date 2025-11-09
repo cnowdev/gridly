@@ -438,4 +438,121 @@ ${otherComponentsContext}
   }
 };
 
-export { fetchGeminiCode, handleCodeEdit };
+const integrateComponentsWithAPI = async (components, endpoints, settings) => {
+  if (!genAI) {
+    console.error("Gemini API Key is not set");
+    return components;
+  }
+
+  if (endpoints.length === 0) {
+    console.log("No endpoints to integrate");
+    return components;
+  }
+
+  const designSystem = getDesignSystemPrompt(settings);
+
+  // Create endpoint context
+  const endpointsContext = endpoints.map(ep => 
+    `- ${ep.method} ${ep.path}: ${ep.description}`
+  ).join('\n');
+
+  const systemPrompt = `
+You are an expert React developer integrating frontend components with backend APIs. 
+
+AVAILABLE API ENDPOINTS:
+${endpointsContext}
+
+API TESTING FUNCTION:
+A special function \`window.__API_TEST__\` is available for making API calls.
+Use it like this:
+
+const result = await window.__API_TEST__(method, path, body);
+// Returns: { status: number, ok: boolean, data: responseData }
+// status: HTTP status code (200, 404, 500, etc.)
+// ok: true if status is 200-299, false otherwise
+// data: the response body from the endpoint
+
+Example usage:
+const response = await window.__API_TEST__('GET', '/api/users');
+if (response.ok) {
+  setUsers(response.data);
+} else {
+  setError(response.data?.error || 'Request failed');
+}
+
+For POST/PUT/PATCH with body:
+const response = await window.__API_TEST__('POST', '/api/users', { name: 'John' });
+if (response.ok) {
+  console.log('Created:', response.data);
+}
+
+INTEGRATION RULES:
+1. Keep ALL existing UI/UX intact - only add API functionality
+2. Use window.__API_TEST__() to call the endpoints (NOT regular fetch)
+3. Add proper error handling with try/catch
+4. Show loading states during API calls
+5. Display API data in the existing UI elements
+6. Use appropriate HTTP methods (GET for reads, POST for creates, etc.)
+7. Handle API errors gracefully with user-friendly messages
+8. ALL API calls MUST include proper error handling
+9. Add useEffect hooks for data fetching where appropriate
+10. Check if window.__API_TEST__ exists before calling it
+
+CRITICAL:
+- DO NOT change the component's visual design or layout
+- DO NOT remove existing functionality
+- DO NOT include exports, imports, or code fences
+- Return ONLY the complete component function code
+- Make sure the component still fills its container (h-full w-full)
+- ALWAYS use window.__API_TEST__ instead of fetch()
+
+${designSystem ? `DESIGN CONTEXT:\n${designSystem}\n` : ""}
+`;
+
+  try {
+    const updatedComponents = [];
+
+    for (const comp of components) {
+      const prompt = `
+${systemPrompt}
+
+CURRENT COMPONENT CODE:
+${comp.code}
+
+Task: Integrate this component with the available API endpoints if relevant.
+- Analyze what data this component might need
+- Use appropriate endpoints to fetch/modify that data
+- Keep all existing UI elements and styling
+- Add loading and error states
+- If no endpoints are relevant to this component, return it unchanged
+- As a reminder, DO NOT INCLUDE IMPORTS!!!
+
+Return the complete updated component code:
+`;
+
+      const response = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+
+      let newCode = response.text.trim();
+
+      // Clean up markdown
+      const match = newCode.match(/```(?:jsx|javascript|js)?\n([\s\S]*?)\n```/);
+      if (match) newCode = match[1];
+      else newCode = newCode.replace(/```jsx|```/g, "");
+
+      updatedComponents.push({
+        ...comp,
+        code: newCode.trim()
+      });
+    }
+
+    return updatedComponents;
+  } catch (error) {
+    console.error("API integration failed:", error);
+    return components;
+  }
+};
+
+export { fetchGeminiCode, handleCodeEdit, integrateComponentsWithAPI };
