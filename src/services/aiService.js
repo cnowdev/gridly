@@ -128,6 +128,7 @@ const fetchGeminiCode = async (
     - Hooks ('useState', 'useEffect', 'useRef') are available.
     - Lucide icons are available as 'Lucide.IconName' (e.g., <Lucide.User />).
     - You also have access to async function generateText(prompt) for generating text content. Use this if you need to generate dynamic text content, like implementing a chatbot.
+    - If the user requests an image other than an AI-generated one, MAKE SURE TO FIND A VALID URL for the image and include it directly in an <img> tag.
 
     Before returning:
     - VERIFY that all navigation or core elements are visible.
@@ -136,7 +137,7 @@ const fetchGeminiCode = async (
 
     ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ""}
 
-    If the user's request conflicts with the design system, follow the user’s intent first.
+    If the user specifically asks for something different from the global design context, prioritize their request. If you feel like a color or font choice from the design system doesn't fit the component being generated, you can deviate from it as needed.
 
     ---
     NEW: At the very end of your response, on a new line, provide a suggested layout in this *exact* format:
@@ -229,6 +230,8 @@ const fetchGeminiCode = async (
         
         Style the image appropriately with Tailwind CSS to fit the overall component design.
         Make sure the component fills its container (h-full w-full).
+        - If the user requests an image other than an AI-generated one, MAKE SURE TO FIND A VALID URL for the image and include it directly in an <img> tag.
+        If the user specifically asks for something different from the global design context, prioritize their request. If you feel like a color or font choice from the design system doesn't fit the component being generated, you can deviate from it as needed.
 
         ${
           designSystem
@@ -379,8 +382,10 @@ ${otherComponentsContext}
     Return the entire new component function only. DO NOT include exports, imports, or code fences.
     Use Tailwind CSS for styling. Hooks are available in scope. All Lucide icons are available under 
     the 'Lucide' namespace (e.g., <Lucide.User />, <Lucide.Bell />, etc).
-
+    - If the user requests an image other than an AI-generated one, MAKE SURE TO FIND A VALID URL for the image and include it directly in an <img> tag.
     ${designSystem ? `IMPORTANT GLOBAL DESIGN CONTEXT:\n${designSystem}\n` : ""}
+
+    If the user specifically asks for something different from the global design context, prioritize their request. If you feel like a color or font choice from the design system doesn't fit the component being generated, you can deviate from it as needed.
 
     ${gridContext} 
 
@@ -441,9 +446,11 @@ ${otherComponentsContext}
         - Use w-full to control width
         - Use h-full to ensure it fills the container height
         - Consider using rounded corners (rounded-lg, rounded-xl) for aesthetics
-        
+        - If the user requests an image other than an AI-generated one, MAKE SURE TO FIND A VALID URL for the image and include it directly in an <img> tag.
         Style the image appropriately with Tailwind CSS to fit the component's design.
         Make sure the component fills its container (h-full w-full).
+
+        If the user specifically asks for something different from the global design context, prioritize their request. If you feel like a color or font choice from the design system doesn't fit the component being generated, you can deviate from it as needed.
 
         ${designSystem ? `DESIGN CONTEXT:\n${designSystem}\n` : ""}
         ${gridContext}
