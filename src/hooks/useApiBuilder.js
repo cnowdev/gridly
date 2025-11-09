@@ -24,43 +24,25 @@ const downloadFile = (content, filename, type = 'text/javascript') => {
   URL.revokeObjectURL(url);
 };
 
-// Helper to read state once safely
-const loadSavedState = () => {
-  try {
-    const saved = localStorage.getItem(API_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : null;
-  } catch (error) {
-    console.error('Failed to load API state:', error);
-    return null;
-  }
-};
-
-// --- NEW HELPER: Robust JSON Parser ---
 const safeJSONParse = (text) => {
     try {
         return JSON.parse(text);
     } catch (e) {
-        // Attempt to fix common LLM JSON issues
         try {
-             // 1. Try to extract JSON from code blocks if present
              const match = text.match(/```json([\s\S]*?)```/);
              if (match) {
                  return JSON.parse(match[1]);
              }
-             // 2. More aggressive cleanup if standard parse fails
-             // This is a basic example, for complex cases a dedicated library might be needed
              const cleaned = text.replace(/[\u0000-\u001F]+/g, ""); 
              return JSON.parse(cleaned);
         } catch (e2) {
              console.error("Failed to parse AI JSON even after cleanup:", text);
-             throw e; // Re-throw original error for the caller to handle
+             throw e; 
         }
     }
 }
 
-
 export function useApiBuilder() {
-  // --- State ---
   const [baseServerCode, setBaseServerCode] = useState(() => {
      const saved = loadSavedState();
      return saved?.baseServerCode || '';
@@ -74,17 +56,13 @@ export function useApiBuilder() {
   const [isApiLoading, setIsApiLoading] = useState(false);
   const isMounted = useRef(false);
 
-  // --- State for Endpoint Editing Modal ---
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentEditingEndpointId, setCurrentEditingEndpointId] = useState(null);
   const [currentEditingCode, setCurrentEditingCode] = useState('');
 
-  // --- State for Base Server Editing Modal ---
   const [isBaseEditModalOpen, setBaseEditModalOpen] = useState(false);
   const [currentEditingBaseCode, setCurrentEditingBaseCode] = useState('');
 
-
-  // --- VIRTUAL SERVER BOOTER ---
   useEffect(() => {
       const bootVirtualServer = () => {
           virtualServer.reset();
@@ -118,7 +96,6 @@ export function useApiBuilder() {
               throw new Error(`Module '${mod}' is not available in the virtual environment.`);
           };
 
-          // Use a default base code if none is set, to ensure 'app' exists
           const effectiveBaseCode = baseServerCode.trim() 
             ? baseServerCode 
             : `const express = require("express");\nconst app = express();\napp.db = {};`;
@@ -151,7 +128,6 @@ export function useApiBuilder() {
           }
       };
 
-      // Always boot server when code changes
       bootVirtualServer();
 
   }, [baseServerCode, endpoints]);
@@ -164,7 +140,6 @@ export function useApiBuilder() {
       }
   }, []);
 
-  // --- Save State ---
   useEffect(() => {
       if (!isMounted.current) {
           isMounted.current = true;
@@ -176,7 +151,6 @@ export function useApiBuilder() {
       }
   }, [baseServerCode, endpoints]);
 
-  // --- Endpoint Modal Handlers ---
   const openEditModal = (endpoint) => {
       setCurrentEditingEndpointId(endpoint.id);
       setCurrentEditingCode(endpoint.code);
@@ -189,7 +163,6 @@ export function useApiBuilder() {
       setCurrentEditingCode('');
   }
 
-  // --- Base Server Modal Handlers ---
   const openBaseEditModal = () => {
       setCurrentEditingBaseCode(baseServerCode);
       setBaseEditModalOpen(true);
@@ -204,7 +177,6 @@ export function useApiBuilder() {
       closeBaseEditModal();
   };
 
-  // --- AI: Reset Base Server Code ---
   const resetBaseServerCode = async () => {
       if (!model) { alert('Gemini API Key is not set.'); return; }
       if (isApiLoading) return;
@@ -229,10 +201,9 @@ export function useApiBuilder() {
       try {
           const result = await model.generateContent(systemPrompt);
           let text = result.response.text();
-          // Remove markdown fences before parsing
           text = text.replace(/```json|```/g, '').trim();
           
-          const data = safeJSONParse(text); // Use safe parser
+          const data = safeJSONParse(text);
           if (data.baseServerCode) {
               setBaseServerCode(data.baseServerCode);
           }
@@ -244,9 +215,7 @@ export function useApiBuilder() {
       }
   };
 
-
-  // --- AI: Generate/Manage Endpoints ---
-  const handleApiPrompt = async (prompt) => {
+  const handleApiPrompt = async (prompt, frontendComponents = []) => {
     if (!model) { alert('Gemini API Key is not set.'); return; }
     setIsApiLoading(true);
 
@@ -254,78 +223,47 @@ export function useApiBuilder() {
         id: ep.id, method: ep.method, path: ep.path, description: ep.description,
     }));
 
+    const frontendContext = frontendComponents.length > 0 
+        ? `FRONTEND CONTEXT (Infer needed endpoints from this UI):\n${frontendComponents.map((comp, i) => `--- Component ${i + 1} ---\n${comp.code}`).join('\n\n')}` 
+        : "NO FRONTEND CONTEXT AVAILABLE";
+
     const systemPrompt = `
-      You are an expert Node.js/Express.js developer. Manage API endpoints based on the user request.
-      
+      You are an expert Node.js/Express.js developer. Manage API endpoints.
       Current Endpoints: ${JSON.stringify(existingEndpointsContext)}
+      ${frontendContext}
 
       CRITICAL RULES FOR VIRTUAL ENVIRONMENT:
-      1. **CHECK FOR DUPLICATES:** Before creating, check if an endpoint with the *exact* same method and path exists. If yes, use action type 'update' with its 'id'.
-      2. **NO EXTERNAL LIBRARIES:** Only 'express' via \`require()\`.
-      3. **USE CORS PROXY:** Route external requests through \`https://corsproxy.io/?\` + encodeURIComponent(url).
-      4. **ROBUST FALLBACK:** External fetches MIGHT fail. You MUST wrap them in \`try/catch\`.
-      5. **REALISTIC SILENT FALLBACKS:** In the \`catch\` block, return REALISTIC literal data. 
-         - DO NOT use words like 'mock', 'fake', 'fallback', or 'error' in the data OR comments.
-         - Make it look like standard data (e.g., \`res.json({ temp: '22°C', condition: 'Sunny' })\`).
-      6. **SHARED STATE:** Use \`app.db\` for ALL shared data.
-      7. **COMPLETE CODE ONLY:** Return complete \`app.METHOD(...)\` calls.
-      8. **CLEAN DESCRIPTIONS:** Professional, concise descriptions only.
-      9. **NO MARKDOWN:** Return PURE JSON.
-      10. **ESCAPE CAREFULLY:** When writing JavaScript code inside the JSON string, ensure ALL backslashes and quotes are properly escaped for JSON.
+      1. CHECK FOR DUPLICATES: Use 'update' action if method+path exists.
+      2. NO EXTERNAL LIBRARIES: Only 'express'.
+      3. USE CORS PROXY for external calls.
+      4. ROBUST FALLBACK with try/catch and REALISTIC data.
+      5. USE \`app.db\` for shared state.
+      6. COMPLETE CODE ONLY: \`app.METHOD(...)\`.
+      7. PURE JSON response.
 
-      Return STRICT JSON with an "actions" array (NO baseServerCode key):
-      {
-        "actions": [
-          {
-            "type": "create",
-            "data": { "method": "GET", "path": "/path", "description": "...", "code": "app.get(...)" }
-          },
-          {
-            "type": "update",
-            "id": "ep-12345",
-            "data": { "method": "POST", "path": "/newpath", "description": "...", "code": "app.post(...)" }
-          }
-        ]
-      }
+      Return STRICT JSON with "actions" array: { "actions": [ { "type": "create"|"update"|"delete", "data": { ... } } ] }
     `;
 
     try {
       const result = await model.generateContent(`${systemPrompt}\n\nUser Prompt: ${prompt}`);
       let text = result.response.text();
-      // Clean up markdown fences before parsing
       text = text.replace(/```json|```/g, '').trim();
-      
-      const data = safeJSONParse(text); // Use safe parser
+      const data = safeJSONParse(text);
 
       if (data.actions) {
           setEndpoints(prev => {
               let newEndpoints = [...prev];
               data.actions.forEach(action => {
-                  
                   if (action.type === 'create') {
-                      // Client-side duplicate check, just in case AI misses.
-                      const existing = newEndpoints.find(ep => 
-                          ep.method.toUpperCase() === action.data.method.toUpperCase() && 
-                          ep.path === action.data.path
-                      );
-                      
+                      const existing = newEndpoints.find(ep => ep.method === action.data.method && ep.path === action.data.path);
                       if (existing) {
-                          // Convert this "create" to an "update"
-                          console.warn(`AI tried to create duplicate ${action.data.method} ${action.data.path}. Converting to update.`);
-                          newEndpoints = newEndpoints.map(ep => 
-                              ep.id === existing.id ? { ...ep, ...action.data, id: existing.id } : ep
-                          );
+                           newEndpoints = newEndpoints.map(ep => ep.id === existing.id ? { ...ep, ...action.data, id: existing.id } : ep);
                       } else {
-                          // True create
                           newEndpoints.push({ ...action.data, id: `ep-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` });
                       }
-                  } 
-                  else if (action.type === 'update') {
-                      newEndpoints = newEndpoints.map(ep => 
-                          ep.id === action.id ? { ...ep, ...action.data, id: action.id } : ep
-                      );
-                  } 
-                  else if (action.type === 'delete') {
+                  } else if (action.type === 'update') {
+                      newEndpoints = newEndpoints.map(ep => ep.id === action.id ? { ...ep, ...action.data, id: action.id } : ep);
+                  } else if (action.type === 'delete') {
                       newEndpoints = newEndpoints.filter(ep => ep.id !== action.id);
                   }
               });
@@ -334,13 +272,26 @@ export function useApiBuilder() {
       }
     } catch (error) {
       console.error("API prompt failed:", error);
-      alert("AI Error. Check console.");
     } finally {
       setIsApiLoading(false);
     }
   };
 
-  // --- AI: Edit Endpoint ---
+  // --- NEW: Auto-Generate All Endpoints ---
+  const autoGenerateEndpoints = async (frontendComponents) => {
+      if (!model) return;
+      if (frontendComponents.length === 0) {
+          alert("No frontend components to analyze.");
+          return;
+      }
+      
+      // Re-use the main handler but with a specific "generate everything" prompt
+      await handleApiPrompt(
+          "Analyze ALL provided frontend components. Generate a COMPLETE set of necessary API endpoints (CRUD, etc.) to make them fully functional. DO NOT delete existing endpoints unless they strictly conflict.", 
+          frontendComponents
+      );
+  };
+
   const editEndpointAi = async (userPrompt) => {
     if (!model || !currentEditingEndpointId) return;
     setIsApiLoading(true);
@@ -348,21 +299,11 @@ export function useApiBuilder() {
     if (!endpointToEdit) { setIsApiLoading(false); return; }
 
     const systemPrompt = `
-      Modify this Express.js endpoint. 
-      CRITICAL RULES:
-      1. Return COMPLETE \`app.METHOD(...)\` call.
-      2. Use 'app.db' for shared state. 
-      3. USE CORS PROXY ('https://corsproxy.io/?' + url) for external calls.
-      4. MUST HAVE TRY/CATCH with REALISTIC SILENT FALLBACK data (no 'mock'/'fake' labels in data or comments).
-      5. CLEAN DESCRIPTIONS.
-      6. No external libraries.
-      7. No markdown.
-      8. ESCAPE CAREFULLY: When writing JavaScript code inside the JSON string, ensure ALL backslashes and quotes are properly escaped for JSON.
-      
+      Modify this Express.js endpoint.
+      Rules: COMPLETE \`app.METHOD(...)\` call, use \`app.db\`, NO markdown.
       Current: ${endpointToEdit.method} ${endpointToEdit.path}
       Code: ${currentEditingCode}
       Request: "${userPrompt}"
-      
       Return STRICT JSON: { "method": "...", "path": "...", "description": "...", "code": "app.get(..." }
     `;
 
@@ -370,8 +311,7 @@ export function useApiBuilder() {
         const result = await model.generateContent(systemPrompt);
         let text = result.response.text();
         text = text.replace(/```json|```/g, '').trim();
-        const data = safeJSONParse(text); // Use safe parser
-        
+        const data = safeJSONParse(text);
         setCurrentEditingCode(data.code);
         setEndpoints(prev => prev.map(ep => ep.id === currentEditingEndpointId ? { ...ep, ...data } : ep));
     } catch (error) { console.error("AI edit failed:", error); } 
@@ -383,23 +323,11 @@ export function useApiBuilder() {
      closeEditModal();
   };
 
-  // --- NEW: Separate generator function ---
   const generateServerCode = () => {
       let fullCode = baseServerCode || 'const express = require("express");\nconst app = express();\napp.db = {};';
       const listenIndex = fullCode.lastIndexOf('app.listen');
-      
-      const dbShim = `
-/* --- Auto-generated DB Shim --- */
-// If app.db was not initialized in base code, initialize it.
-if (typeof app.db === 'undefined') {
-  console.log('Initializing app.db shim');
-  app.db = {};
-}
-/* ------------------------------- */
-`;
-      
+      const dbShim = `\nif (typeof app.db === 'undefined') { app.db = {}; }\n`;
       let endpointsStr = endpoints.map(ep => `\n// ${ep.description}\n${ep.code}`).join('\n');
-      // Remove proxy usage for export
       endpointsStr = endpointsStr.replace(/https:\/\/corsproxy\.io\/\?\+?\s*encodeURIComponent\(([^)]+)\)/g, '$1');
 
       if (listenIndex !== -1) {
@@ -409,13 +337,8 @@ if (typeof app.db === 'undefined') {
       }
       
       if (listenIndex === -1) {
-          fullCode += `\n\nconst PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(\`Server running on port \${PORT}\`);
-});
-`;
+          fullCode += `\n\nconst PORT = process.env.PORT || 3000;\napp.listen(PORT, () => console.log(\`Server running on port \${PORT}\`));`;
       }
-
       return fullCode;
   };
 
@@ -424,21 +347,23 @@ app.listen(PORT, () => {
       downloadFile(fullCode, 'server.js', 'text/javascript');
   };
 
+  // Helper to read state once safely
+  function loadSavedState() {
+      try {
+          const saved = localStorage.getItem(API_STORAGE_KEY);
+          return saved ? JSON.parse(saved) : null;
+      } catch (error) { return null; }
+  }
+
   return {
     baseServerCode, setBaseServerCode, endpoints, 
     deleteEndpoint: (id) => setEndpoints(prev => prev.filter(ep => ep.id !== id)),
-    generateEndpoint: handleApiPrompt, isApiLoading, 
-    // Export both the download function AND the string generator
-    exportApiCode, generateServerCode,
-    
-    // Endpoint modal
-    isEditModalOpen, currentEditingCode, setCurrentEditingCode, 
-    openEditModal, closeEditModal,
+    generateEndpoint: handleApiPrompt, 
+    autoGenerateEndpoints, // Export new function
+    isApiLoading, exportApiCode, generateServerCode,
+    isEditModalOpen, currentEditingCode, setCurrentEditingCode, openEditModal, closeEditModal,
     editEndpointAi, saveAndValidateEndpoint, testEndpoint,
-
-    // Base server modal
     isBaseEditModalOpen, openBaseEditModal, closeBaseEditModal,
-    currentEditingBaseCode, setCurrentEditingBaseCode,
-    saveBaseEditModal, resetBaseServerCode
+    currentEditingBaseCode, setCurrentEditingBaseCode, saveBaseEditModal, resetBaseServerCode
   };
 }

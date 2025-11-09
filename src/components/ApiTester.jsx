@@ -12,7 +12,8 @@ export default function ApiTester({ onTest, endpoints, onClose }) {
   // Prefill path if only one exists, or when endpoints change
   useEffect(() => {
       if (endpoints.length > 0 && !path) {
-          setMethod(endpoints[0].method);
+          // ADD .toUpperCase() to ensure case matches the dropdown values exactly
+          setMethod((endpoints[0].method || 'GET').toUpperCase());
           setPath(endpoints[0].path);
       }
   }, [endpoints]);

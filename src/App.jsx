@@ -46,19 +46,23 @@ export default function App() {
   const apiBuilder = useApiBuilder();
 
   const [isFirstTime, setIsFirstTime] = useState(false);
-  const [activeMode, setActiveMode] = useState('frontend');
+  const [activeMode, setActiveMode] = useState('frontend'); // 'frontend' | 'backend' | 'merged'
   const [isApiViewOpen, setIsApiViewOpen] = useState(false);
+  // NEW: Lifted state for API tester
+  const [isApiTesterOpen, setIsApiTesterOpen] = useState(false);
+
   // NEW: State for tracking merged export progress
   const [exportProgress, setExportProgress] = useState(null);
 
   // Auto-integrate when entering merged mode
   useEffect(() => {
     if (activeMode === 'merged' && grid.components.length > 0 && apiBuilder.endpoints.length > 0) {
+      // Only integrate if we don't have merged components yet
       if (grid.mergedComponents.length === 0) {
         grid.handleIntegrateWithAPI(apiBuilder.endpoints);
       }
     }
-  }, [activeMode, grid, apiBuilder.endpoints]);
+  }, [activeMode, grid.components, apiBuilder.endpoints, grid.mergedComponents, grid]);
 
   // Re-integrate when endpoints or components change while in merged mode
   useEffect(() => {
@@ -66,7 +70,7 @@ export default function App() {
       // Optionally auto-refresh when data changes
       // You might want to add a manual refresh button instead
     }
-  }, [apiBuilder.endpoints.length, grid.components.length, activeMode, grid.mergedComponents.length]);
+  }, [activeMode, apiBuilder.endpoints.length, grid.components.length, grid.mergedComponents.length]);
 
   useEffect(() => {
     const hasSeenWelcome = localStorage.getItem('hasSeenSettingsWelcome');
@@ -78,7 +82,7 @@ export default function App() {
     if (!grid.settings) {
       grid.handleSaveSettings(DEFAULT_SETTINGS);
     }
-  }, [grid.setIsSettingsOpen, grid.settings, grid.handleSaveSettings]);
+  }, [grid.setIsSettingsOpen, grid.settings, grid.handleSaveSettings, grid]);
 
   const handleSaveSettingsWrapper = (newSettings) => {
     grid.handleSaveSettings(newSettings);
@@ -90,10 +94,12 @@ export default function App() {
   };
 
   const mainRef = useRef(null);
+  // State to track the actual grid width for the modal
   const [currentGridWidth, setCurrentGridWidth] = useState(1200);
 
   useEffect(() => {
     if (!mainRef.current) return;
+    // Only observe resize if we are in frontend mode to avoid errors if mainRef changes
     if (activeMode !== 'frontend') return;
 
     const observer = new ResizeObserver(entries => {
@@ -105,6 +111,7 @@ export default function App() {
     });
 
     observer.observe(mainRef.current);
+    // Initial set
     if (mainRef.current) {
        const initialWidth = mainRef.current.clientWidth;
        grid.setGridWidth(initialWidth);
@@ -112,39 +119,20 @@ export default function App() {
     }
 
     return () => observer.disconnect();
-  }, [grid.setGridWidth, activeMode]);
+  }, [grid.setGridWidth, activeMode, grid]); // Re-run when mode changes
 
   // --- Unified Submit Handler ---
   const handleUnifiedSubmit = (e) => {
-      e.preventDefault(); // Moved here, as it's common to all
-      
       if (activeMode === 'frontend') {
-          const prompt = grid.chatPrompt.toLowerCase();
-          
-          // --- NEW: Heuristic for detecting a global edit prompt ---
-          const isGlobalEdit = [
-              'all components', 
-              'every component', 
-              'dark mode', 
-              'light mode',
-              'theme',
-              'global',
-              'update all'
-          ].some(keyword => prompt.includes(keyword));
-          
-          if (isGlobalEdit && grid.components.length > 0) {
-              // Call the new global prompt handler
-              grid.handleGlobalPromptSubmit(e);
-          } else {
-              // Call the normal "new component" prompt handler
-              grid.handlePromptSubmit(e);
-          }
-          
+          grid.handlePromptSubmit(e);
       } else if (activeMode === 'backend') {
+          e.preventDefault();
           if (!grid.chatPrompt.trim()) return;
-          apiBuilder.generateEndpoint(grid.chatPrompt);
+          // Pass grid.components as context for backend generation
+          apiBuilder.generateEndpoint(grid.chatPrompt, grid.components);
           grid.setChatPrompt('');
       }
+      // No chat in merged mode
   };
 
   // --- Unified Export Handler ---
@@ -176,13 +164,19 @@ export default function App() {
     <>
        <style>{`
         .layout {
-          background-color: ${grid.settings?.colors?.background || '#111827'};
+          background-color: #111827; /* gray-900 */
           background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
                             linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
           background-size: 4.1666667% 20px;
         }
-        .react-grid-item > .react-resizable-handle { z-index: 20; }
-        .react-draggable-dragging .live-preview-wrapper { pointer-events: none; }
+
+        .react-grid-item > .react-resizable-handle {
+          z-index: 20;
+        }
+
+        .react-draggable-dragging .live-preview-wrapper {
+          pointer-events: none;
+        }
       `}</style>
 
       {/* --- EXPORT PROGRESS OVERLAY --- */}
@@ -211,18 +205,22 @@ export default function App() {
             setIsSettingsOpen={grid.setIsSettingsOpen}
             setIsApiViewOpen={setIsApiViewOpen}
             isExporting={!!exportProgress} // Pass down loading state
+            // NEW PROPS for Backend Mode
+            isApiTesterOpen={isApiTesterOpen}
+            setIsApiTesterOpen={setIsApiTesterOpen}
+            onAutoGenerateEndpoints={() => apiBuilder.autoGenerateEndpoints(grid.components)}
+            isBackendLoading={apiBuilder.isApiLoading}
         />
 
         {/* ===== Main Content Area ===== */}
         <main
           ref={mainRef}
           // Only attach grid handlers in frontend mode
-          onMouseDown={activeMode === 'frontend' && !grid.isPreviewMode ? grid.handleGridMouseDown : undefined}
-          onMouseMove={activeMode === 'frontend' && !grid.isPreviewMode ? grid.handleGridMouseMove : undefined}
-          onMouseUp={activeMode === 'frontend' && !grid.isPreviewMode ? grid.handleGridMouseUp : undefined}
-          onMouseLeave={activeMode === 'frontend' && !grid.isPreviewMode ? grid.handleGridMouseUp : undefined}
-          className="flex-grow overflow-auto relative layout" // <-- FIX: Added 'layout' class
-          // <-- FIX: Removed redundant inline style
+          onMouseDown={activeMode === 'frontend' ? grid.handleGridMouseDown : undefined}
+          onMouseMove={activeMode === 'frontend' ? grid.handleGridMouseMove : undefined}
+          onMouseUp={activeMode === 'frontend' ? grid.handleGridMouseUp : undefined}
+          onMouseLeave={activeMode === 'frontend' ? grid.handleGridMouseUp : undefined}
+          className="flex-grow overflow-auto relative"
         >
           {activeMode === 'frontend' ? (
              grid.isPreviewMode ? (
@@ -254,8 +252,14 @@ export default function App() {
                 </>
              )
           ) : activeMode === 'backend' ? (
-             <ApiView apiState={apiBuilder} />
+             /* Backend Mode View */
+             <ApiView 
+                apiState={apiBuilder} 
+                isTesterOpen={isApiTesterOpen}
+                setIsApiTesterOpen={setIsApiTesterOpen}
+             />
           ) : activeMode === 'merged' ? (
+             /* Merged Mode View */
              <MergedPreview 
                components={grid.mergedComponents.length > 0 ? grid.mergedComponents : grid.components}
                settings={grid.settings}
@@ -268,7 +272,7 @@ export default function App() {
           ) : null}
         </main>
 
-        {/* Chat Bar */}
+        {/* Chat Bar - Hidden in Preview Mode and Merged Mode */}
         {!(activeMode === 'frontend' && grid.isPreviewMode) && activeMode !== 'merged' && (
           <ChatBar
             prompt={grid.chatPrompt}
@@ -289,6 +293,8 @@ export default function App() {
           layout={grid.currentEditingLayout}
           gridWidth={currentGridWidth}
         />
+
+        {/* API ENDPOINT EDIT MODAL */}
         <ApiEndpointEditModal 
             isOpen={apiBuilder.isEditModalOpen}
             onClose={apiBuilder.closeEditModal}
@@ -303,9 +309,10 @@ export default function App() {
             isOpen={apiBuilder.isBaseEditModalOpen}
             onClose={apiBuilder.closeBaseEditModal}
             code={apiBuilder.currentEditingBaseCode}
-            setCode={apiBuilder.setCurrentEditingCode}
+            setCode={apiBuilder.setCurrentEditingBaseCode}
             onSave={apiBuilder.saveBaseEditModal}
         />
+
         <SettingsModal
           isOpen={grid.isSettingsOpen}
           onClose={() => grid.setIsSettingsOpen(false)}
