@@ -65,5 +65,5 @@ The integration hub. Gemini 2.5 Pro analyzes your entire grid and API list, then
     ```bash
     npm run dev
     ```
-<img width="1464" height="871" alt="Screenshot 2025-11-09 at 7 11 25 AM" src="https://github.com/user-attachments/assets/24b540a1-4fd7-41db-970b-9244362ad4ed" />
 <img width="1464" height="871" alt="Screenshot 2025-11-09 at 6 53 44 AM" src="https://github.com/user-attachments/assets/cacc9c11-7ccb-4001-90c1-ae17cbccb44e" />
+<img width="1464" height="871" alt="Screenshot 2025-11-09 at 7 11 25 AM" src="https://github.com/user-attachments/assets/24b540a1-4fd7-41db-970b-9244362ad4ed" />
