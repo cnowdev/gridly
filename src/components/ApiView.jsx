@@ -11,10 +11,10 @@ export default function ApiView({ apiState }) {
     deleteEndpoint,
     openEditModal,
     testEndpoint,
-    // New props for base server
     openBaseEditModal,
     resetBaseServerCode,
     isApiLoading,
+    exportApiCode, // <-- Added this from apiState
   } = apiState;
 
   const [expandedId, setExpandedId] = useState('base');
@@ -46,7 +46,17 @@ export default function ApiView({ apiState }) {
             <div className="max-w-3xl mx-auto space-y-6">
                 
                 {/* Header Actions */}
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-3">
+                    {/* --- NEW EXPORT BUTTON --- */}
+                    <button
+                        onClick={exportApiCode}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors"
+                        title="Download server.js"
+                    >
+                        <Lucide.Download size={16} />
+                        Export Server
+                    </button>
+
                     <button
                         onClick={() => setIsTesterOpen(!isTesterOpen)}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isTesterOpen ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
@@ -65,6 +75,7 @@ export default function ApiView({ apiState }) {
                     </div>
                 )}
 
+                {/* ... rest of the component (Base Server Card, Endpoints List) remains the same ... */}
                 {/* --- Base Server Setup Card --- */}
                 <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
                     <div
@@ -72,10 +83,8 @@ export default function ApiView({ apiState }) {
                     >
                         <button 
                             onClick={() => toggleExpand('base')}
-                            // --- FIX: Changed items-center to items-start ---
                             className="flex-1 flex items-start gap-3 min-w-0" 
                         >
-                            {/* Added mt-0.5 to nudge icon down slightly for optical alignment */}
                             <Lucide.Box size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />
                             <div className="min-w-0">
                                 <h3 className="font-semibold">Base Server Setup</h3>
@@ -85,7 +94,6 @@ export default function ApiView({ apiState }) {
                             </div>
                         </button>
 
-                        {/* Base Server Action Buttons */}
                         <div className="flex items-center gap-2 flex-shrink-0 ml-4">
                             <button
                                 onClick={openBaseEditModal}

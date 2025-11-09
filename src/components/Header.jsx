@@ -1,14 +1,12 @@
 import * as Lucide from 'lucide-react';
 import { motion } from 'framer-motion';
 
-export default function Header({activeMode, setActiveMode, togglePreview, isPreviewMode, components, clearAllComponents, handleExport, handleUndo, canUndo, handleRedo, canRedo, setIsSettingsOpen, setIsApiViewOpen}) {
+export default function Header({activeMode, setActiveMode, togglePreview, isPreviewMode, components, clearAllComponents, handleExport, handleUndo, canUndo, handleRedo, canRedo, setIsSettingsOpen, setIsApiViewOpen, isExporting}) {
     return (
         <header className="flex-shrink-0 p-4 bg-gray-800 border-b border-gray-700 shadow-md z-10 flex items-center justify-between">
             {/* ===== Title + Mode Toggle ===== */}
             <div className="flex items-center gap-4">
                 <img src="/gridly.svg" alt="Gridly Logo" className="h-7" />
-
-                {/* <h1 className="text-xl font-bold flex items-center gap-2"> gridly </h1> */}
 
                 {/* ===== Animated Mode Toggle (3 options) ===== */}
                 <div className="relative flex items-center bg-gray-700 rounded-full px-1 py-1 text-sm font-medium w-[270px]">
@@ -116,11 +114,11 @@ export default function Header({activeMode, setActiveMode, togglePreview, isPrev
                     <>
                         <button
                             onClick={handleExport}
-                            disabled={components.length === 0}
+                            disabled={components.length === 0 || isExporting}
                             className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-medium text-sm flex items-center gap-2 transition-colors"
-                            title="Export Merged Project (Coming Soon)"
+                            title="Export Merged Project"
                         >
-                            <Lucide.PackageOpen size={16} />
+                            {isExporting ? <Lucide.Loader2 className="animate-spin" size={16} /> : <Lucide.PackageOpen size={16} />}
                             Export Full Project
                         </button>
                     </>

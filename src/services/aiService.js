@@ -565,4 +565,52 @@ Return the complete updated component code:
   }
 };
 
-export { fetchGeminiCode, handleCodeEdit, integrateComponentsWithAPI };
+// --- NEW: Function to clean up components for export ---
+const convertComponentToRealApi = async (componentCode) => {
+    if (!genAI) return componentCode;
+    
+    // Quick check to see if it even uses the test API
+    if (!componentCode.includes('window.__API_TEST__')) {
+        return componentCode;
+    }
+
+    const prompt = `
+You are an expert React developer.
+Convert this component's API calls from a testing harness to real, modern \`fetch\` calls.
+
+TARGET BACKEND: http://localhost:3000
+
+RULES:
+1. Replace ALL occurrences of \`window.__API_TEST__(method, path, body)\` with standard \`fetch\` calls.
+2. Use the full URL: \`http://localhost:3000\` + path.
+3. Handle the fetch response correctly:
+   - \`window.__API_TEST__\` returned \`{ ok: boolean, status: number, data: any }\`.
+   - You must manually parse the JSON from standard fetch: \`const data = await res.json();\`
+   - Ensure \`res.ok\` is checked.
+4. Maintain identical error handling and state updates.
+5. DO NOT change any other part of the component's logic or UI.
+6. DO NOT include imports, exports, or code fences. Just the component function body.
+
+CURRENT CODE:
+${componentCode}
+`;
+
+    try {
+        const response = await genAI.models.generateContent({
+             model: "gemini-2.5-flash",
+             contents: prompt,
+        });
+        
+        let newCode = response.text.trim();
+        const match = newCode.match(/```(?:jsx|javascript|js)?\n([\s\S]*?)\n```/);
+        if (match) newCode = match[1];
+        else newCode = newCode.replace(/```jsx|```/g, "");
+        
+        return newCode.trim();
+    } catch (error) {
+        console.error("Failed to convert component to real API:", error);
+        return componentCode; // Fallback to original code on error
+    }
+};
+
+export { fetchGeminiCode, handleCodeEdit, integrateComponentsWithAPI, convertComponentToRealApi };

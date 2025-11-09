@@ -383,11 +383,11 @@ export function useApiBuilder() {
      closeEditModal();
   };
 
-  const exportApiCode = () => {
+  // --- NEW: Separate generator function ---
+  const generateServerCode = () => {
       let fullCode = baseServerCode || 'const express = require("express");\nconst app = express();\napp.db = {};';
       const listenIndex = fullCode.lastIndexOf('app.listen');
       
-      // We shim 'db' differently now, assuming 'app.db' is the standard
       const dbShim = `
 /* --- Auto-generated DB Shim --- */
 // If app.db was not initialized in base code, initialize it.
@@ -408,7 +408,6 @@ if (typeof app.db === 'undefined') {
           fullCode += dbShim + '\n\n/* --- API Routes --- */\n' + endpointsStr;
       }
       
-      // Add a standard app.listen if it's missing for the export
       if (listenIndex === -1) {
           fullCode += `\n\nconst PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
@@ -416,14 +415,21 @@ app.listen(PORT, () => {
 });
 `;
       }
-      
+
+      return fullCode;
+  };
+
+  const exportApiCode = () => {
+      const fullCode = generateServerCode();
       downloadFile(fullCode, 'server.js', 'text/javascript');
   };
 
   return {
     baseServerCode, setBaseServerCode, endpoints, 
     deleteEndpoint: (id) => setEndpoints(prev => prev.filter(ep => ep.id !== id)),
-    generateEndpoint: handleApiPrompt, isApiLoading, exportApiCode,
+    generateEndpoint: handleApiPrompt, isApiLoading, 
+    // Export both the download function AND the string generator
+    exportApiCode, generateServerCode,
     
     // Endpoint modal
     isEditModalOpen, currentEditingCode, setCurrentEditingCode, 

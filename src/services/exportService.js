@@ -1,3 +1,6 @@
+import JSZip from 'jszip';
+import { convertComponentToRealApi } from './aiService';
+
 // Now generates a full App.jsx file and accepts settings for styling.
 const generateAppJsx = (components, settings) => {
   const backgroundColor = settings?.colors?.background || '#111827'; // Default to gray-900
@@ -20,6 +23,7 @@ export default function App() {
     <div 
       className="grid grid-cols-24 min-h-screen w-full"
       style={{ 
+        gridTemplateColumns: 'repeat(24, minmax(0, 1fr))',
         gridTemplateRows: 'repeat(${minRows}, 20px)',
         gridAutoRows: '20px',
         backgroundColor: '${backgroundColor}'
@@ -59,7 +63,7 @@ const downloadFile = (blob, filename) => {
   URL.revokeObjectURL(url);
 };
 
-export const handleExport = async () => {
+export const handleExport = async (components, settings) => {
     if (components.length === 0) {
       alert('No components to export!');
       return;
@@ -82,17 +86,93 @@ export const handleExport = async () => {
     // Generate and download zip
     try {
       const content = await zip.generateAsync({ type: "blob" });
-      downloadFile(content, "gridly-export.zip"); // Use the new helper
+      downloadFile(content, "gridly-export.zip");
     } catch (error) {
       console.error("Failed to generate zip file:", error);
       alert("Failed to export project. See console for details.");
     }
 };
 
+// --- NEW: Merged Export Handler ---
+export const handleMergedExport = async (components, serverCode, settings, onProgress) => {
+    if (components.length === 0) { alert('No components to export!'); return; }
+    
+    const zip = new JSZip();
+    const frontend = zip.folder("frontend");
+    const backend = zip.folder("backend");
+
+    try {
+        // 1. Prepare Backend
+        backend.file("server.js", serverCode);
+        backend.file("package.json", JSON.stringify({
+            "name": "gridly-backend",
+            "version": "1.0.0",
+            "main": "server.js",
+            "scripts": { "start": "node server.js" },
+            "dependencies": { "express": "^4.18.2", "cors": "^2.8.5" }
+        }, null, 2));
+
+        // 2. Prepare Frontend (Clean up components first)
+        const cleanedComponents = [];
+        for (let i = 0; i < components.length; i++) {
+            if (onProgress) onProgress(`Preparing component ${i + 1} of ${components.length}...`);
+            // Use AI to replace window.__API_TEST__ with real fetch calls
+            const cleanedCode = await convertComponentToRealApi(components[i].code);
+            cleanedComponents.push({ ...components[i], code: cleanedCode });
+        }
+
+        if (onProgress) onProgress("Finalizing project files...");
+
+        // Generate App.jsx with cleaned components
+        const appJsx = generateAppJsx(cleanedComponents, settings);
+
+        frontend.file("src/App.jsx", appJsx);
+        frontend.file("package.json", getPackageJson("gridly-frontend"));
+        frontend.file("tailwind.config.js", tailwindConfigContent);
+        frontend.file("postcss.config.js", postcssConfigContent);
+        frontend.file("index.html", indexHtmlContent);
+        frontend.file("src/main.jsx", mainJsxContent);
+        frontend.file("src/index.css", indexCssContent);
+        frontend.file(".env", "VITE_API_URL=http://localhost:3000");
+
+        // 3. Add README
+        zip.file("README.md", `# Gridly Full-Stack Project
+
+## Setup
+
+1. **Backend**:
+   \`\`\`bash
+   cd backend
+   npm install
+   npm start
+   \`\`\`
+   Server runs on http://localhost:3000
+
+2. **Frontend**:
+   \`\`\`bash
+   cd frontend
+   npm install
+   npm run dev
+   \`\`\`
+   App runs on http://localhost:5173
+`);
+
+        // 4. Generate and download
+        const content = await zip.generateAsync({ type: "blob" });
+        downloadFile(content, "gridly-fullstack.zip");
+
+    } catch (error) {
+        console.error("Merged export failed:", error);
+        alert("Export failed. See console.");
+    } finally {
+        if (onProgress) onProgress(null); // Clear progress
+    }
+};
+
 // package.json
-const getPackageJson = () => {
+const getPackageJson = (name = "gridly-export") => {
   return JSON.stringify({
-    "name": "gridly-export",
+    "name": name,
     "private": true,
     "version": "0.0.0",
     "type": "module",
@@ -124,7 +204,11 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+       gridTemplateColumns: {
+        '24': 'repeat(24, minmax(0, 1fr))',
+      }
+    },
   },
   plugins: [],
 }`;
