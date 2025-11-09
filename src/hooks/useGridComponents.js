@@ -415,11 +415,10 @@ export function useGridComponents() {
     await clearAllImages();
     setComponentsWithHistory([]);
     setMergedComponents([]);
-    setPlaceholderLayout({ i: 'placeholder', x: 0, y: 0, w: 4, h: 2 });
+    handleCancelPlaceholder();
   };
 
   /**
-   * NEW: This wrapper is for the <CodeEditModal>
    * It calls the AI function using the `currentEditingId` from state.
    */
   const handleModalCodeEdit = async (currentCode, userPrompt) => {
