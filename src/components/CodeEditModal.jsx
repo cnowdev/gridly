@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { LiveProvider, LiveEditor, LivePreview, LiveError } from 'react-live';
 import * as Lucide from 'lucide-react';
+import { generateText } from '../services/aiService';
 
 // Default constants matching GridContainer.jsx
 const TOTAL_COLS = 12;
@@ -112,6 +113,7 @@ export default function CodeEditModal({ isOpen, onClose, code, setCode, onSave, 
     useCallback: React.useCallback,
     useRef: React.useRef,
     Lucide: Lucide,
+    generateText: generateText
   };
 
   return (
