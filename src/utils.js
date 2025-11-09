@@ -881,6 +881,8 @@ ${otherComponentsContext}
     }
     await clearAllImages(); // Clear all from IndexedDB
     setComponentsWithHistory([]);
+    // Added: explicitly hide the placeholder when clearing all
+    setShowPlaceholder(false);
     setPlaceholderLayout({ i: 'placeholder', x: 0, y: 0, w: 4, h: 2 });
   };
 

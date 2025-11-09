@@ -1,155 +1,160 @@
-import React, { useState } from "react";
-import * as Lucide from "lucide-react";
-import { generate, isInitialized } from "../api/geminiClient";
 
-export default function ApiView({ isOpen, onClose }) {
-  const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState("gemini-2.5-flash");
-  const [responseText, setResponseText] = useState("");
-  const [raw, setRaw] = useState(null);
-  const [nodeSnippet, setNodeSnippet] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+import React, { useState } from 'react';
+import * as Lucide from 'lucide-react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import ApiTester from './ApiTester';
 
-  if (!isOpen) return null;
+export default function ApiView({ apiState }) {
+  const {
+    baseServerCode,
+    endpoints,
+    deleteEndpoint,
+    openEditModal,
+    testEndpoint,
+  } = apiState;
 
-  const runGenerate = async () => {
-    setError(null);
-    setLoading(true);
-    setResponseText("");
-    setRaw(null);
-    setNodeSnippet("");
+  const [expandedId, setExpandedId] = useState('base');
+  const [isTesterOpen, setIsTesterOpen] = useState(true);
 
-    try {
-      if (!isInitialized())
-        throw new Error("Gemini client not initialized (check VITE_GEMINI_API_KEY)");
-
-      const res = await generate(prompt, model);
-      setResponseText(res.text || "");
-      setRaw(res.raw);
-      generateNodeSnippet(model);
-    } catch (err) {
-      console.error("API view generate failed:", err);
-      setError(err.message || String(err));
-    } finally {
-      setLoading(false);
-    }
+  const toggleExpand = (id) => {
+    setExpandedId(expandedId === id ? null : id);
   };
 
-  const generateNodeSnippet = (modelName) => {
-    const snippet = `// Example Node.js API endpoint for Gemini
-import express from "express";
-import { GoogleGenAI } from "@google/genai";
-
-const router = express.Router();
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-router.post("/generate", async (req, res) => {
-  try {
-    const { prompt } = req.body;
-    const result = await genAI.models.generateContent({
-      model: "${modelName}",
-      contents: prompt,
-    });
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-export default router;`;
-
-    setNodeSnippet(snippet);
+  const MethodBadge = ({ method }) => {
+    const colors = {
+      GET: 'bg-green-900/50 text-green-300 border-green-700',
+      POST: 'bg-blue-900/50 text-blue-300 border-blue-700',
+      PUT: 'bg-yellow-900/50 text-yellow-300 border-yellow-700',
+      DELETE: 'bg-red-900/50 text-red-300 border-red-700',
+      PATCH: 'bg-purple-900/50 text-purple-300 border-purple-700',
+    };
+    return (
+      <span className={`px-2 py-0.5 border rounded text-xs font-bold flex-shrink-0 ${colors[method.toUpperCase()] || 'bg-gray-700 text-gray-300'}`}>
+        {method.toUpperCase()}
+      </span>
+    );
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-8">
-      <div className="w-full max-w-5xl bg-gray-800 rounded-lg shadow-xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700">
-          <div className="flex items-center gap-3">
-            <Lucide.Server size={20} className="text-blue-400" />
-            <h3 className="text-lg font-semibold text-white">API View</h3>
-            <span className="text-xs text-gray-400">
-              Build & Inspect Gemini API Endpoints
-            </span>
-          </div>
-          <button onClick={onClose} className="text-gray-300 hover:text-white">
-            <Lucide.X size={20} />
-          </button>
+    <div className="h-full w-full flex overflow-hidden relative">
+        {/* Main Content - Endpoints List */}
+        <div className="flex-1 bg-gray-900 text-white p-6 overflow-auto">
+            <div className="max-w-3xl mx-auto space-y-6">
+                
+                {/* Header Actions */}
+                <div className="flex justify-end">
+                    <button
+                        onClick={() => setIsTesterOpen(!isTesterOpen)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isTesterOpen ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+                    >
+                        <Lucide.Zap size={16} />
+                        {isTesterOpen ? 'Hide Tester' : 'Test API'}
+                    </button>
+                </div>
+
+                {endpoints.length === 0 && !baseServerCode && (
+                    <div className="text-center text-gray-400 py-12 border-2 border-dashed border-gray-700 rounded-xl">
+                        <Lucide.Server size={48} className="mx-auto mb-4 opacity-50" />
+                        <h2 className="text-xl font-semibold mb-2">No Endpoints Yet</h2>
+                        <p>Use the chat bar below to generate your first Node.js/Express API endpoint.</p>
+                    </div>
+                )}
+
+                {baseServerCode && (
+                <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+                    <button
+                    onClick={() => toggleExpand('base')}
+                    className="w-full flex items-center justify-between p-4 hover:bg-gray-750 transition-colors text-left"
+                    >
+                    <div className="flex items-center gap-3">
+                        <Lucide.Box size={20} className="text-blue-400" />
+                        <div>
+                        <h3 className="font-semibold">Base Server Setup</h3>
+                        <p className="text-sm text-gray-400">Initial configuration</p>
+                        </div>
+                    </div>
+                    {expandedId === 'base' ? <Lucide.ChevronUp size={20} /> : <Lucide.ChevronDown size={20} />}
+                    </button>
+                    
+                    {expandedId === 'base' && (
+                    <div className="border-t border-gray-700">
+                        <SyntaxHighlighter 
+                            language="javascript" 
+                            style={vscDarkPlus}
+                            customStyle={{ margin: 0, borderRadius: 0, fontSize: '14px' }}
+                        >
+                        {baseServerCode}
+                        </SyntaxHighlighter>
+                    </div>
+                    )}
+                </div>
+                )}
+
+                {endpoints.map((ep) => (
+                <div key={ep.id} className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:border-gray-600 transition-colors">
+                    <div className="flex items-center justify-between p-4 gap-4">
+                        <button 
+                            onClick={() => toggleExpand(ep.id)}
+                            className="flex-1 flex items-center gap-4 text-left min-w-0"
+                        >
+                            <MethodBadge method={ep.method} />
+                            <code className="text-sm bg-gray-900 px-2 py-1 rounded text-blue-300 font-mono flex-shrink-0">
+                                {ep.path}
+                            </code>
+                            {/* Added title attribute here for tooltip */}
+                            <span className="text-gray-400 text-sm truncate" title={ep.description}>
+                                {ep.description}
+                            </span>
+                        </button>
+                        
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                                onClick={() => openEditModal(ep)}
+                                className="p-2 text-gray-400 hover:text-blue-400 transition-colors"
+                                title="Edit Endpoint"
+                            >
+                                <Lucide.Pencil size={18} />
+                            </button>
+                            <button
+                                onClick={() => deleteEndpoint(ep.id)}
+                                className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                                title="Delete Endpoint"
+                            >
+                                <Lucide.Trash2 size={18} />
+                            </button>
+                            <button
+                                onClick={() => toggleExpand(ep.id)}
+                                className="p-2 text-gray-400 hover:text-white transition-colors"
+                            >
+                                {expandedId === ep.id ? <Lucide.ChevronUp size={20} /> : <Lucide.ChevronDown size={20} />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {expandedId === ep.id && (
+                    <div className="border-t border-gray-700">
+                        <SyntaxHighlighter 
+                            language="javascript" 
+                            style={vscDarkPlus}
+                            customStyle={{ margin: 0, borderRadius: 0, fontSize: '14px' }}
+                        >
+                        {ep.code}
+                        </SyntaxHighlighter>
+                    </div>
+                    )}
+                </div>
+                ))}
+
+            </div>
         </div>
-
-        {/* Body */}
-        <div className="p-4 space-y-5">
-          {/* Prompt input */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              runGenerate();
-            }}
-            className="flex gap-2"
-          >
-            <input
-              className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Enter raw prompt to send to Gemini"
-            />
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="bg-gray-700 border border-gray-600 text-white rounded px-2"
-            >
-              <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-              <option value="gemini-2.0-pro">gemini-2.0-pro</option>
-            </select>
-            <button
-              type="submit"
-              disabled={loading || !prompt.trim()}
-              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white disabled:opacity-60"
-            >
-              {loading ? "Running…" : "Run"}
-            </button>
-          </form>
-
-          {/* Request / Response */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-xs text-gray-400 mb-2">Request Preview</div>
-              <pre className="whitespace-pre-wrap bg-gray-900 p-3 rounded text-sm text-white h-48 overflow-auto">
-                {prompt || "<empty>"}
-              </pre>
+        
+        {/* Right Pane: API Tester (Toggleable) */}
+        {isTesterOpen && (
+            <div className="w-[400px] flex-shrink-0 border-l border-gray-800 bg-gray-950 shadow-2xl z-10">
+                 <ApiTester onTest={testEndpoint} endpoints={endpoints} onClose={() => setIsTesterOpen(false)} />
             </div>
-
-            <div>
-              <div className="text-xs text-gray-400 mb-2">Response Text</div>
-              <pre className="whitespace-pre-wrap bg-gray-900 p-3 rounded text-sm text-white h-48 overflow-auto">
-                {responseText || (error ? `Error: ${error}` : "<no response>")}
-              </pre>
-            </div>
-          </div>
-
-          {/* Raw JSON */}
-          <div>
-            <div className="text-xs text-gray-400 mb-2">Raw Response (JSON)</div>
-            <pre className="whitespace-pre-wrap bg-gray-900 p-3 rounded text-sm text-white h-40 overflow-auto">
-              {raw ? JSON.stringify(raw, null, 2) : "<no raw response>"}
-            </pre>
-          </div>
-
-          {/* Node.js Endpoint */}
-          {nodeSnippet && (
-            <div>
-              <div className="text-xs text-gray-400 mb-2">
-                Generated Node.js Endpoint
-              </div>
-              <pre className="whitespace-pre-wrap bg-gray-900 p-3 rounded text-sm text-green-400 h-56 overflow-auto">
-                {nodeSnippet}
-              </pre>
-            </div>
-          )}
-        </div>
-      </div>
+        )}
     </div>
   );
 }
