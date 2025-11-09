@@ -398,7 +398,7 @@ export function useGridComponents() {
         setImagesLoaded(true);
         
         // After images are loaded, update component code with restored URLs
-        setComponents(prevComps =>
+        setComponentsWithHistory(prevComps =>
           prevComps.map(comp => {
             if (!comp.imageKeys || comp.imageKeys.length === 0) {
               return comp;
@@ -463,7 +463,12 @@ export function useGridComponents() {
   const fetchGeminiCode = async (prompt) => {
     if (!genai) {
       alert('Gemini API Key is not set in .env file.');
-      return '() => <div className="text-red-500 p-4">Error: Please set your API key in .env</div>';
+      const errorId = `comp-${Date.now()}`;
+      return { 
+        code: '() => <div className="text-red-500 p-4">Error: Please set your API key in .env</div>',
+        componentId: errorId,
+        imageKeys: []
+      };
     }
 
     const designSystem = getDesignSystemPrompt();
@@ -497,6 +502,10 @@ export function useGridComponents() {
 
     const fullPrompt = `${systemPrompt}\n\nUser prompt: ${prompt}`;
 
+    // Generate component ID first
+    const newComponentId = `comp-${Date.now()}`;
+    let imageKeys = [];
+
     try {
       const response = await genai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -512,11 +521,16 @@ export function useGridComponents() {
         const imageBase64 = await generateImage(imagePrompt);
         
         if (imageBase64) {
-          // Generate a temporary component ID for this image
-          const tempId = `comp-${Date.now()}`;
+          // Use the component ID we already generated
+          const imageURL = await cacheImageAsURL(imageBase64, newComponentId);
           
-          // Convert base64 to blob URL (await it!)
-          const imageURL = await cacheImageAsURL(imageBase64, tempId);
+          // Extract the actual key from the cache
+          for (const [key, data] of imageCache.entries()) {
+            if (data.url === imageURL && key.startsWith(newComponentId)) {
+              imageKeys.push(key);
+              break;
+            }
+          }
           
           // Now re-prompt to generate the full component with the image URL
           const componentPrompt = `
@@ -576,10 +590,18 @@ export function useGridComponents() {
       if (match) code = match[1];
       else code = code.replace(/```jsx|```/g, '');
 
-      return code.trim();
+      return { 
+        code: code.trim(), 
+        componentId: newComponentId,
+        imageKeys 
+      };
     } catch (error) {
       console.error('Gemini API call failed:', error);
-      return `() => <div className="text-red-500 p-4">Error: ${error.message}</div>`;
+      return { 
+        code: `() => <div className="text-red-500 p-4">Error: ${error.message}</div>`,
+        componentId: newComponentId,
+        imageKeys: []
+      };
     }
   };
 
@@ -734,25 +756,15 @@ ${otherComponentsContext}
     }
 
     setIsLoading(true);
-    const generatedCode = await fetchGeminiCode(chatPrompt);
+    const result = await fetchGeminiCode(chatPrompt);
 
-      if (generatedCode) {
-      const newId = `comp-${Date.now()}`;
-      
-      // Extract any image keys from the generated code
-      const imageKeys = [];
-      for (const [key, data] of imageCache.entries()) {
-        if (generatedCode.includes(data.url)) {
-          imageKeys.push(key);
-        }
-      }
-      
+    if (result && result.code) {
       const newComponent = {
-        id: newId,
-        code: generatedCode,
+        id: result.componentId,
+        code: result.code,
         isLocked: false,
-        layout: { ...placeholderLayout, i: newId },
-        imageKeys, // Store image keys for restoration
+        layout: { ...placeholderLayout, i: result.componentId },
+        imageKeys: result.imageKeys, // Use the imageKeys from the result
       };
 
       setComponentsWithHistory((prev) => [...prev, newComponent]);
