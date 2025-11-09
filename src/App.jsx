@@ -19,8 +19,8 @@ function getDrawingRect(start, end, scrollTop = 0, scrollLeft = 0) {
     
     const left = Math.min(start.x, end.x) - scrollLeft;
     const top = Math.min(start.y, end.y) - scrollTop;
-    const width = Math.abs(start.x, end.x);
-    const height = Math.abs(start.y, end.y);
+    const width = Math.abs(start.x - end.x);
+    const height = Math.abs(start.y - end.y);
 
     return {
         position: 'absolute',
@@ -113,7 +113,7 @@ export default function App() {
     return () => observer.disconnect();
   }, [grid.setGridWidth, activeMode]); // Re-run when mode changes
 
-  // --- MODIFIED: Unified Submit Handler ---
+  // --- Unified Submit Handler ---
   const handleUnifiedSubmit = (e) => {
       e.preventDefault(); // Moved here, as it's common to all
       
@@ -206,8 +206,8 @@ export default function App() {
           onMouseMove={activeMode === 'frontend' && !grid.isPreviewMode ? grid.handleGridMouseMove : undefined}
           onMouseUp={activeMode === 'frontend' && !grid.isPreviewMode ? grid.handleGridMouseUp : undefined}
           onMouseLeave={activeMode === 'frontend' && !grid.isPreviewMode ? grid.handleGridMouseUp : undefined}
-          className="flex-grow overflow-auto relative"
-          style={{ backgroundColor: grid.settings?.colors?.background || '#111827' }} // Apply background color
+          className="flex-grow overflow-auto relative layout" // <-- FIX: Added 'layout' class
+          // <-- FIX: Removed redundant inline style
         >
           {activeMode === 'frontend' ? (
              grid.isPreviewMode ? (
@@ -292,7 +292,7 @@ export default function App() {
             isOpen={apiBuilder.isBaseEditModalOpen}
             onClose={apiBuilder.closeBaseEditModal}
             code={apiBuilder.currentEditingBaseCode}
-            setCode={apiBuilder.setCurrentEditingBaseCode}
+            setCode={apiBuilder.setCurrentEditingCode}
             onSave={apiBuilder.saveBaseEditModal}
         />
 
