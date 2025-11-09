@@ -43,6 +43,19 @@ const generateImage = async (imagePrompt) => {
     }
 };
 
+export const generateText = async (prompt) => {
+    try {
+        const response = await genAI.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+        return response.text.trim();
+    } catch (error) {
+        console.error('Text generation failed:', error);
+        return null;
+    }
+}
+
 const fetchGeminiCode = async (prompt, settings, cacheImageAsURL, imageCache) => {
     if (!genAI) {
         alert('Gemini API Key is not set in .env file.');
@@ -73,6 +86,7 @@ const fetchGeminiCode = async (prompt, settings, cacheImageAsURL, imageCache) =>
     - DO use Tailwind CSS for all styling.
     - The component should be self-contained and responsive, filling its container (use 'h-full w-full').
     - React hooks like 'useState', 'useEffect', and 'useRef' are available in scope.
+    - You also have access to async function generateText(prompt) for generating text content. Use this if you need to generate dynamic text content, like implementing a chatbot.
     - Assume 'lucide-react' icons are available in scope.
     - When using Lucide icons, use Lucide.IconName (e.g., <Lucide.User />).
     - Respond ONLY with the raw component function:

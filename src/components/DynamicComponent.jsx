@@ -1,6 +1,7 @@
 import React from 'react';
 import { LiveProvider, LivePreview, LiveError } from 'react-live';
 import * as Lucide from 'lucide-react';
+import { generateText } from '../services/aiService';
 
 const scope = {
   React,
@@ -9,6 +10,7 @@ const scope = {
   useCallback: React.useCallback,
   useRef: React.useRef,
   Lucide: Lucide,
+  generateText: generateText,
 };
 
 export default function DynamicComponent({ code }) {
