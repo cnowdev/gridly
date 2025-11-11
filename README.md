@@ -4,6 +4,11 @@ Gridly is an AI-powered, full-stack application builder that turns natural langu
 
 At its core, Gridly uses a suite of Google Generative AI models (Gemini 2.5 Flash, Gemini 2.5 Pro, and Imagen 3) to act as your co-pilot.
 
+🎥 **Watch the demo video on YouTube:**  
+[![Gridly Demo Video](https://img.youtube.com/vi/yro1r7tLPYM/0.jpg)](https://www.youtube.com/watch?v=yro1r7tLPYM)
+
+---
+
 ## Key Features
 
 * **AI-Powered Component Generation**: Describe a UI element and Gridly generates a responsive React component with Tailwind CSS.
@@ -65,5 +70,6 @@ The integration hub. Gemini 2.5 Pro analyzes your entire grid and API list, then
     ```bash
     npm run dev
     ```
-<img width="1464" height="871" alt="Screenshot 2025-11-09 at 6 53 44 AM" src="https://github.com/user-attachments/assets/cacc9c11-7ccb-4001-90c1-ae17cbccb44e" />
-<img width="1464" height="871" alt="Screenshot 2025-11-09 at 7 11 25 AM" src="https://github.com/user-attachments/assets/24b540a1-4fd7-41db-970b-9244362ad4ed" />
+
+<img width="1464" height="871" alt="Screenshot 2025-11-09 at 6 53 44 AM" src="https://github.com/user-attachments/assets/cacc9c11-7ccb-4001-90c1-ae17cbccb44e" />
+<img width="1464" height="871" alt="Screenshot 2025-11-09 at 7 11 25 AM" src="https://github.com/user-attachments/assets/24b540a1-4fd7-41db-970b-9244362ad4ed" />
