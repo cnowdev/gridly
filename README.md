@@ -51,7 +51,7 @@ The integration hub. Gemini 2.5 Pro analyzes your entire grid and API list, then
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/your-username/gridly.git](https://github.com/your-username/gridly.git)
+    git clone https://github.com/cnowdev/gridly.git
     cd gridly
     ```
 
